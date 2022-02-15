@@ -29,4 +29,8 @@ anti_join(covr2, hght2)
 
 
 
-# can all the species in heights and density be found in cover?
+# can all the species in heights and density be found in cover?  
+
+
+
+# do the averages in the density and height sheets match what's pasted in the 'cover' sheet?  

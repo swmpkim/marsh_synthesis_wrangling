@@ -2,9 +2,10 @@
 ### originated 2022-02-15  
 ### latest update 2022-02-15  
 
-## Sheet names  
+## Sheets  
 
-Need to remove 'Example' or 'TEMPLATE' from the worksheet names - otherwise the code won't work the same for every reserve's file.  
++  Need to remove 'Example' or 'TEMPLATE' from the worksheet names in final version - otherwise the code won't work the same for every reserve's file.  
++  We are transferring the heights and densities into the 'cover' sheet in the Excel sheet itself? If so, one of my checks will be to verify the numbers match what they should and alert the user if something is "off". (other situation would be "I'll set the code up to calculate these and combine with cover" - but it looks like they're already separate columns in the cover sheet)    
 
 
 
