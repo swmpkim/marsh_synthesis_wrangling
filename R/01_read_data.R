@@ -8,6 +8,15 @@ dat_file <- here::here("data", "template_2022-02-14", "Vegetation Dataset EXAMPL
 stns <- read_xlsx(dat_file,
                   sheet = "Station Table Example")
 
+covr <- read_xlsx(dat_file,
+                  sheet = "Cover Example")
+
+dens <- read_xlsx(dat_file,
+                  sheet = "Density Example")
+
+hght <- read_xlsx(dat_file,
+                  sheet = "Height Example 2")  # this one looks like it allows for replicates
+
 
 # Species worksheet has a lot of steps ----
 spps_index <- read_xlsx(dat_file, 
@@ -40,3 +49,28 @@ spps <- read_xlsx(dat_file,
 
 # clean up
 rm(spps_index, non_na_spps, tabl_non_nas, ind)
+
+
+## Make data formats consistent  ----
+# make a function and then use it on all three data frames  
+
+# this is going to throw errors if anything is wrong in the files though
+# and eventually there WILL be things wrong in the files
+# FIGURE OUT HOW TO TEST AND DEAL WITH THIS
+### how to ask "is this coercible to the class I want?" 
+format_veg_in <- function(x){
+    to_form <- x
+    to_form %>% 
+        mutate(across(c(Reserve_Code, Site, Site_Code, Transect_Number,
+                        Plot_Number, Unique_ID, Habitat_Type,
+                        Vegetation_Zone, starts_with("F_")),
+                      as.character),
+               across(c(Year, Month, Day, Elevation_NAVD88, 
+                        Elevation_Relative_to_MLLW, Distance_to_water_m),
+                      as.numeric))
+    
+}
+
+dens2 <- format_veg_in(dens)
+
+
