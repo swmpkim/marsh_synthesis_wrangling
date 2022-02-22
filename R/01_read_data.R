@@ -71,6 +71,6 @@ format_veg_in <- function(x){
     
 }
 
-dens2 <- format_veg_in(dens)
-covr2 <- format_veg_in(covr)
-hght2 <- format_veg_in(hght)
+dens <- format_veg_in(dens)
+covr <- format_veg_in(covr)
+hght <- format_veg_in(hght)

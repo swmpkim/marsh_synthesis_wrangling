@@ -40,7 +40,7 @@ identical(dens3, hght3)
 identical(covr3, hght3)
 
 # HERE IT IS
-test <- map2_lgl(covr3, dens3, identical)
+test <- purrr::map2_lgl(covr3, dens3, identical)
 test[which(test == FALSE)]
 glue("Contents of the column `", names(test[which(test == FALSE)]), 
      "` do not match across data frames.")
