@@ -11,13 +11,18 @@ Might be a good idea to have a separate script and/or shiny app just for data ch
 Also see `assertr` - this allows for chained verifications etc. https://cran.r-project.org/web/packages/assertr/vignettes/assertr.html  
 
 
+**CAREFUL about empty cells when pivoting longer - deal with 0s vs. NAs issue**  - may be possible to get general list of species definitely counted/assessed for each plot, and remove species that are not? (because columns contain species across all plots)  
+
+
 
 
 ## Sheets  
 
 +  Need to remove 'Example' or 'TEMPLATE' from the worksheet names in final version - otherwise the code won't work the same for every reserve's file.  
     +  CP will fix  
-+  We are transferring the heights and densities into the 'cover' sheet in the Excel sheet itself? If so, one of my checks will be to verify the numbers match what they should and alert the user if something is "off". (other situation would be "I'll set the code up to calculate these and combine with cover" - but it looks like they're already separate columns in the cover sheet)    
++  We are transferring the heights and densities into the 'cover' sheet in the Excel sheet itself?   
+    +  YES - 'height' and 'density' sheets are only for replicates
+    +  If so, one of my checks will be to verify the numbers match what they should and alert the user if something is "off". (other situation would be "I'll set the code up to calculate these and combine with cover" - but it looks like they're already separate columns in the cover sheet)    
     +  CP and KC, look over TAG feedback  
 +  Move "Notes" column    
 
