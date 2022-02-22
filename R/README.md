@@ -1,6 +1,12 @@
 # THOUGHTS on working with template data  
 ### originated 2022-02-15  
-### latest update 2022-02-15  
+### latest update 2022-02-22  
+
+I'm starting to dig into the `assertive` and `testthat` packages for some of these checks.  
+
+
+Might be a good idea to have a separate script and/or shiny app just for data checks: make sure data will be able to be all combined; and tell people what (and where) the problem is so they can go back and fix it in the original spreadsheet. Then resume the rest of the process.  
+
 
 ## Sheets  
 

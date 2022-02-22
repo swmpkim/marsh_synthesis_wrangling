@@ -1,33 +1,49 @@
 source(here::here("R", "01_read_data.R"))
 
+library(glue)
+library(assertive)
+
 # in theory, all plots should have a row for cover, density, and height
-# right??? 
 # so make sure those row numbers are equal
 
 nrow(covr) == nrow(dens)
 nrow(covr) == nrow(hght)
 
-
+assert_all_are_equal_to(c(nrow(dens), nrow(hght), nrow(covr)), 
+                        nrow(covr))
 
 # are all the 'primary key' values the same across all three sheets?
 # everything from Reserve_Code to Distance_to_water_m?
 # if we add new columns, we'll need to put them in between these two
 # and this will all still work
-covr2 <- covr %>% 
+covr3 <- covr2 %>% 
     select(Reserve_Code:Distance_to_water_m)
-dens2 <- dens %>% 
+dens3 <- dens2 %>% 
     select(Reserve_Code:Distance_to_water_m)
-hght2 <- hght %>% 
+hght3 <- hght2 %>% 
     select(Reserve_Code:Distance_to_water_m)
 
-anti_join(covr2, dens2)
-anti_join(covr2, hght2)
-# Error: Can't combine `Plot_Number` <double> and `Plot_Number` <character>.
-# so need to go back to 01 and specify (and enforce?) data classes
+# want anti-joins to be empty
+left_join(covr3, dens3) %>% View()
+janitor::compare_df_cols(covr3, hght3)  # checks column names and classes, but not the contents
+dplyr::all_equal(dens3, hght3)  # these two ARE the same
+dplyr::all_equal(covr3, hght3)
+# janitor::compare_df_cols compares column names and classes, but not content
+# dplyr::all_equal also checks content and tells you which rows don't match
+# it doesn't tell you which columns don't match though
+# maybe apply all_equal to each column of the data frames?
+
+apply(covr3, MARGIN = 2, FUN = function(x) dplyr::all_equal(x, dens3[[x]]))
 
 
+identical(dens3, hght3)
+identical(covr3, hght3)
 
-
+# HERE IT IS
+test <- map2_lgl(covr3, dens3, identical)
+test[which(test == FALSE)]
+glue("Contents of the column `", names(test[which(test == FALSE)]), 
+     "` do not match across data frames.")
 
 # can all the species in heights and density be found in cover?  
 
