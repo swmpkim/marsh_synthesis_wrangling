@@ -73,12 +73,16 @@ testlong <- pivot_longer(testwide,
 
 # names(helpme %>% select(-c(id, starts_with(c("F_", "Density", "Height")))))
 
-testnames <- names(helpme)
+# testnames <- names(helpme)
 
 # after sourcing 01_read_data, can use:
-# testnames <- names(covr)
+testnames <- names(covr)
+
+# identify the id columns that shouldn't get "Cover_" pasted on
+#id_cols <- c("id", "Reserve_code")
+
 # want to use Reserve_Code:Notes as the id_cols
-# id_cols <- 
+id_cols <- 1:which(testnames == "Notes")
 
 # index the known non-cover columns
 dens_vars <- str_which(testnames, "Density")
@@ -89,13 +93,15 @@ f_cover <- f_vars[!(f_vars %in% c(dens_vars, ht_vars))]
 # make them start with "F_Cover_"
 testnames[f_cover] <- str_replace(testnames[f_cover], "F_", "F_Cover_")
 
-# identify the id columns that shouldn't get "Cover_" pasted on
-id_cols <- c("id", "Reserve_code")
+
 # make a vector of all the indices above
 big_index <- unique(c(dens_vars, ht_vars, f_vars))
 # paste Cover_ to all the stuff *not* identified already
-testnames[-c(big_index, testnames %in% id_cols)] <- paste0("Cover_",
-                                                           testnames[-c(big_index, testnames %in% id_cols)])
+testnames[-c(big_index, id_cols)] <- paste0("Cover_",
+                                            testnames[-c(big_index, id_cols)])
+
+# Replace F_ with F- for easier pivoting
+testnames <- str_replace(testnames, "F_", "F-")
 
 
 # spp_vars <- testnames[-c(big_index, testnames %in% id_cols)]
@@ -105,3 +111,10 @@ testnames[-c(big_index, testnames %in% id_cols)] <- paste0("Cover_",
 # testnames[-c(big_index, testnames %in% id_cols)] <- spp_cover
 
 
+covr2 <- covr
+names(covr2) <- testnames
+covr_long <- pivot_longer(covr2,
+                          -all_of(id_cols),
+                          names_to = c(".value", "Species"),
+                          names_sep = "_")
+names(covr_long) <- str_replace(names(covr_long), "F-", "F_")
