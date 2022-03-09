@@ -16,12 +16,12 @@ assert_all_are_equal_to(c(nrow(dens), nrow(hght), nrow(covr)),
 # everything from Reserve_Code to Distance_to_water_m?
 # if we add new columns, we'll need to put them in between these two
 # and this will all still work
-covr3 <- covr2 %>% 
-    select(Reserve_Code:Distance_to_water_m)
-dens3 <- dens2 %>% 
-    select(Reserve_Code:Distance_to_water_m)
-hght3 <- hght2 %>% 
-    select(Reserve_Code:Distance_to_water_m)
+covr3 <- covr %>% 
+    select(Reserve_Code:Distance_to_water)
+dens3 <- dens %>% 
+    select(Reserve_Code:Distance_to_water)
+hght3 <- hght %>% 
+    select(Reserve_Code:Distance_to_water)
 
 # want anti-joins to be empty
 left_join(covr3, dens3) %>% View()
@@ -32,8 +32,6 @@ dplyr::all_equal(covr3, hght3)
 # dplyr::all_equal also checks content and tells you which rows don't match
 # it doesn't tell you which columns don't match though
 # maybe apply all_equal to each column of the data frames?
-
-apply(covr3, MARGIN = 2, FUN = function(x) dplyr::all_equal(x, dens3[[x]]))
 
 
 identical(dens3, hght3)
@@ -50,3 +48,15 @@ glue("Contents of the column `", names(test[which(test == FALSE)]),
 
 
 # do the averages in the density and height sheets match what's pasted in the 'cover' sheet?  
+
+dens_long <- dens %>% 
+    select(-Notes) %>% 
+    pivot_longer(-(Reserve_Code:Distance_to_water),
+                 names_to = "species",
+                 values_to = "density")
+hght_long <- hght %>% 
+    select(-Notes) %>% 
+    pivot_longer(-(Reserve_Code:Distance_to_water),
+                 names_to = c("genus", "species", "rep"),
+                 names_sep = " ",
+                 values_to = "height") 
