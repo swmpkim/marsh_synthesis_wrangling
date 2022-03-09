@@ -1,3 +1,5 @@
+library(tidyverse)
+
 # qc codes won't always be "ok" but they'll always be characters
 # numbers are entirely made up
 
@@ -68,3 +70,38 @@ testlong <- pivot_longer(testwide,
 # and add "Cover_" as a prefix
 # also find F_species (e.g. NOT F_Density or F_Height) and 
 # make that "F-Cover_species"
+
+# names(helpme %>% select(-c(id, starts_with(c("F_", "Density", "Height")))))
+
+testnames <- names(helpme)
+
+# after sourcing 01_read_data, can use:
+# testnames <- names(covr)
+# want to use Reserve_Code:Notes as the id_cols
+# id_cols <- 
+
+# index the known non-cover columns
+dens_vars <- str_which(testnames, "Density")
+ht_vars <- str_which(testnames, "Height")
+f_vars <- str_which(testnames, "F_")
+# find ones that need to start with "F_Cover_"
+f_cover <- f_vars[!(f_vars %in% c(dens_vars, ht_vars))]
+# make them start with "F_Cover_"
+testnames[f_cover] <- str_replace(testnames[f_cover], "F_", "F_Cover_")
+
+# identify the id columns that shouldn't get "Cover_" pasted on
+id_cols <- c("id", "Reserve_code")
+# make a vector of all the indices above
+big_index <- unique(c(dens_vars, ht_vars, f_vars))
+# paste Cover_ to all the stuff *not* identified already
+testnames[-c(big_index, testnames %in% id_cols)] <- paste0("Cover_",
+                                                           testnames[-c(big_index, testnames %in% id_cols)])
+
+
+# spp_vars <- testnames[-c(big_index, testnames %in% id_cols)]
+# spp_cover <- paste0("Cover_", spp_vars)
+# 
+# testnames[f_cover] <- str_replace(testnames[f_cover], "F_", "F_Cover_")
+# testnames[-c(big_index, testnames %in% id_cols)] <- spp_cover
+
+
