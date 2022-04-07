@@ -33,12 +33,16 @@ spps <- read_xlsx(dat_file,
 format_veg_in <- function(x){
     to_form <- x
     to_form %>% 
-        mutate(across(c(Reserve_Code, Site, Site_Code, Transect_Number,
-                        Plot_Number, Unique_ID, Habitat_Type,
+        mutate(across(c(Reserve, SiteID, TransectID,
+                        PlotID, Unique_ID, Type,
                         Vegetation_Zone, starts_with("F_")),
                       as.character),
-               across(c(Year, Month, Day, Elevation_NAVD88, 
-                        Elevation_Relative_to_MLLW, Distance_to_water),
+               across(c(Year, Month, Day, Orthometric_Height, 
+                        Height_Relative_to_MLLW, Distance_to_water,
+                        starts_with("Average"),
+                        starts_with("Diameter"),
+                        starts_with("Height"),
+                        starts_with("Density")),
                       as.numeric))
     
 }

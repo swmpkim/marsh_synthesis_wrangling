@@ -88,7 +88,7 @@ id_cols <- 1:which(testnames == "Notes")
 dens_vars <- str_which(testnames, "Density")
 ht_vars <- str_which(testnames, "Height")
 f_vars <- str_which(testnames, "F_")
-# find ones that need to start with "F_Cover_"
+# all f_vars at this point need to have F_ turned into QAQC_
 f_cover <- f_vars[!(f_vars %in% c(dens_vars, ht_vars))]
 # make them start with "F_Cover_"
 testnames[f_cover] <- str_replace(testnames[f_cover], "F_", "F_Cover_")
