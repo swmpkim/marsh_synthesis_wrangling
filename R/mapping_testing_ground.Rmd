@@ -59,19 +59,27 @@ check_num2 <- function(x){
 }
 
 # read in the file, figure out how much to skip, read it in again, and rename the columns from the first test file
-read_cdmo <- function(file){
+read_cdmo <- function(file,
+                      worksheet = NULL,
+                      skip = NULL){
+    # worksheet option if different worksheets of interest are in the file
+    # skip option for reserves where the number to skip is known and the way to automate a guess *isn't* known  
     to_mod <- read_xlsx(file,
                         n_max = 10,
-                        na = c("", "NA"))
-    # to_skip <- skip_fun(to_mod$TransectID)
+                        na = c("", "NA"),
+                        sheet = worksheet)
     
-    # which column has "Cover" in it?
+    # which column has "Lat" in it? This should be numeric.
     lat <- str_which(names(to_mod), "Lat")
     lat_vec <- to_mod[[lat]]
     
-    to_skip <- skip_fun(lat_vec)  # changed from Transect because Cover should always be a number..... right? Someone's probably typed NAs in though, so modified read_xlsx for this calculation. not modifying below because for now I want to keep purposefully included NAs.
+    if(is.null(skip)){
+        skip <- skip_fun(lat_vec)  
+    }
+    
     dat <- read_xlsx(file,
-                     skip = to_skip,
+                     sheet = worksheet,
+                     skip = skip,
                      col_names = FALSE) 
     names(dat) <- names(to_mod)
     dat <- dat %>% 
@@ -85,7 +93,9 @@ bind_coords <- function(df){
     to_bind <- df %>% 
         select(Reserve, SiteID, TransectID, PlotID, Lat, Long) %>% 
         filter(Lat != "NA") %>% 
-        mutate(Lat = as.numeric(Lat),
+        mutate(Lat = str_trim(Lat),
+               Long = str_trim(Long),
+               Lat = as.numeric(Lat),
                Long = as.numeric(Long)) %>% 
         group_by(Reserve, SiteID, TransectID, PlotID) %>% 
         summarize(Lat = round(mean(Lat, na.rm = TRUE), 5),
@@ -154,14 +164,28 @@ bind_coords(gtm)
 
 Separate folders for different reserve components.  
 
-
-
 HAS NAs for LAT AND LONG which I was using above because other reserves didn't all have a number fo transect, plot, and/or cover. I don't know how else to make R recognize the number of header rows so I may have to just write a modified function for reserves like this.  
+
+RC component has some leading and trailing spaces in Lat (and maybe Long) - removed spaces through the bind_coords function but check to see if it's a problem in other columns. This prevented the cells from being converted to numeric.  
 
 ```{r}
 file_in <- here::here(path_start, "NOC", "Masonboro_Island_component",
                       "NOC_MI_2020.xlsx")
+noc_mi <- read_cdmo(file_in, skip = 5)  # this is correct
 
+
+file_in <- here::here(path_start, "NOC", "Rachel_Carson_component",
+                      "NOC_RC_2019.xlsx")
+noc_rc <- read_cdmo(file_in, skip = 5) # this is correct
+
+
+file_in <- here::here(path_start, "NOC", "Zekes_Island_component",
+                      "NOC_ZI_2019.xlsx")
+noc_zi <- read_cdmo(file_in, skip = 5) # also worked correctly
+
+bind_coords(noc_mi)
+bind_coords(noc_rc)
+bind_coords(noc_zi)
 ```
 
 
@@ -206,6 +230,36 @@ bind_coords(kac)
 ```
 
 
+#### SOS  
+
+CDMO format, but different years in different worksheets. Will have to specify worksheet.  
+
+Wait, they don't have lat/longs in this file! Must be in metadata somewhere. Oh, there's some in the 'Elevations' file. Not sure if PlotIDs are the same. 
+
+```{r}
+file_in <- here::here(path_start, "SOS", 
+                      "SOS_PercCov_2010_2021.xlsx")
+
+```
+
+
+
+#### DEL  
+
+CDMO format, but different reserve components in different worksheets. Will have to specify worksheet.  
+
+```{r}
+file_in <- here::here(path_start, "DEL", "Veg Data and Metadata",
+                      "2018 DEL Veg Monitoring Raw Data.xlsx")
+del_sjr <- read_cdmo(file_in, worksheet = "SJR") %>% 
+    mutate(Reserve = "DEL-SJR")
+del_bcr <- read_cdmo(file_in, worksheet = "BCR") %>% 
+    mutate(Reserve = "DEL-BCR")
+bind_coords(del_sjr)
+bind_coords(del_bcr)
+```
+
+
 ## Other long-format reserves  
 
 
@@ -226,7 +280,7 @@ See what we've got:
 all_coords %>% 
     group_by(Reserve) %>% 
     tally() %>% 
-    knitr::kable()
+    knitr::kable(align = "l")
 ```
 
 # Map!  
@@ -235,8 +289,8 @@ all_coords %>%
 leaflet(all_coords) %>% 
     addProviderTiles(providers$Esri.WorldImagery) %>% 
     addCircles(lat = ~Lat, lng = ~Long,
-               color = "orange")
+               color = "orange",
+               popup = ~paste(Reserve, SiteID, sep = "-")) %>% 
+    addScaleBar()
 ```
-
-
 
