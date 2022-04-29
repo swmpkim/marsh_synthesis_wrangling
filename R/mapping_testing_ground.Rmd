@@ -1,0 +1,242 @@
+---
+title: "Coordinate Mapping"
+author: "Kim Cressman"
+date: "4/28/2022"
+output: 
+    html_document:
+        toc: true
+        code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      warning = FALSE,
+                      message = FALSE)
+```
+
+Really messy script to read in a single file for each reserve and pull GPS coordinates for their stations. While I'm at it, I'll see how many have multiple values for the same station (like GND's - eek). But I'll average coordinates together for this mapping purpose.  
+
+```{r}
+library(tidyverse)
+library(readxl)
+library(leaflet)
+```
+
+# Setup  
+
+## Output prep  
+
+```{r}
+all_coords <- tibble(Reserve = character(),
+                     SiteID = character(),
+                     Lat = numeric(),
+                     Long = numeric())
+```
+
+
+## Helpful functions  
+
+Because I'll be doing this repetitively on similar data files....  
+
+```{r}
+# starting path for data
+path_start <- here::here("submitted_data", "data")
+
+# figure out how many rows of headers there are
+### function is modified from `check_num2` at https://stackoverflow.com/a/67532389
+### to figure out which rows can't be converted to numeric
+skip_fun <- function(x){
+  y <- suppressWarnings(as.numeric(x))
+  if(is.numeric(x)){  # if it's already a number, there was only one row of headers so that's all we need to skip (adding headers back in later)
+      return(1)
+      }
+  max(which(is.na(y))) + 1
+}
+
+check_num2 <- function(x){
+  y <- suppressWarnings(as.numeric(x))
+  which(is.na(y))
+}
+
+# read in the file, figure out how much to skip, read it in again, and rename the columns from the first test file
+read_cdmo <- function(file){
+    to_mod <- read_xlsx(file,
+                        n_max = 10,
+                        na = c("", "NA"))
+    # to_skip <- skip_fun(to_mod$TransectID)
+    
+    # which column has "Cover" in it?
+    lat <- str_which(names(to_mod), "Lat")
+    lat_vec <- to_mod[[lat]]
+    
+    to_skip <- skip_fun(lat_vec)  # changed from Transect because Cover should always be a number..... right? Someone's probably typed NAs in though, so modified read_xlsx for this calculation. not modifying below because for now I want to keep purposefully included NAs.
+    dat <- read_xlsx(file,
+                     skip = to_skip,
+                     col_names = FALSE) 
+    names(dat) <- names(to_mod)
+    dat <- dat %>% 
+        mutate(SiteID = as.character(SiteID))
+    return(dat)
+}
+
+# bind to `all_coords`
+## don't do this twice; it doesn't check to see if these coordinates are already there
+bind_coords <- function(df){
+    to_bind <- df %>% 
+        select(Reserve, SiteID, TransectID, PlotID, Lat, Long) %>% 
+        filter(Lat != "NA") %>% 
+        mutate(Lat = as.numeric(Lat),
+               Long = as.numeric(Long)) %>% 
+        group_by(Reserve, SiteID, TransectID, PlotID) %>% 
+        summarize(Lat = round(mean(Lat, na.rm = TRUE), 5),
+                  Long = round(mean(Long, na.rm = TRUE), 5)) %>% 
+        ungroup() %>% 
+        select(Reserve, SiteID, Lat, Long)
+    all_coords <<- bind_rows(all_coords, to_bind)  
+    cat(paste(nrow(to_bind), "rows have been added to `all_coords`"))
+}
+```
+
+
+
+## Reserve-by-reserve  
+
+### CDMO-formatted data  
+
+#### APA  
+
+```{r}
+file_in <- here::here(path_start, "APA", "Data", "APAVEG2020MOD.xlsx")
+apa <- read_cdmo(file_in)
+bind_coords(apa)
+```
+
+#### CBV  
+
+had to add "Other" as a column name in the file because there was text lower down in the column and this caused problems later.    
+
+```{r}
+file_in <- here::here(path_start, "CBV", "CBNERRVA VEG Data GI Reserve for Chris Peter.xlsx")
+cbv <- read_cdmo(file_in) 
+bind_coords(cbv)
+```
+
+#### JAC  
+
+```{r}
+file_in <- here::here(path_start, "JAC", "2021", "JAC 2021 Marsh Vegetation.xlsx")
+jac <- read_cdmo(file_in)
+bind_coords(jac)
+```
+
+
+#### NIW  
+
+In this file, 'Lat' is repeated in the 'Long' column for Segment B, Plot 3-3. Removing these before binding coords because it's only one plot; will need to fix before doing other analyses.  
+
+```{r}
+file_in <- here::here(path_start, "NIW", "NIWVEG2020.xlsx")
+niw <- read_cdmo(file_in) %>% 
+    filter(Long < 0)
+bind_coords(niw)
+```
+
+
+#### GTM  
+
+```{r}
+file_in <- here::here(path_start, "GTM", "GTMVEG2020.xlsx")
+gtm <- read_cdmo(file_in)
+bind_coords(gtm)
+```
+
+#### NOC  
+
+Separate folders for different reserve components.  
+
+
+
+HAS NAs for LAT AND LONG which I was using above because other reserves didn't all have a number fo transect, plot, and/or cover. I don't know how else to make R recognize the number of header rows so I may have to just write a modified function for reserves like this.  
+
+```{r}
+file_in <- here::here(path_start, "NOC", "Masonboro_Island_component",
+                      "NOC_MI_2020.xlsx")
+
+```
+
+
+#### GND  
+
+```{r}
+file_in <- here::here(path_start, "GND", "Veg Data and Metadata",
+                      "GNDVEG2020.xlsx")
+gnd <- read_cdmo(file_in)
+bind_coords(gnd)
+```
+
+
+#### MAR  
+
+Somethings weird with these coordinates; they're not making transects when all coords for a plot are averaged together.  
+
+```{r}
+file_in <- here::here(path_start, "MAR", "Vegetation and Metadata",
+                      "MARVEG2020_marsh_04.22.2021.xlsx")
+mar <- read_cdmo(file_in)
+bind_coords(mar)
+```
+
+#### ELK  
+
+```{r}
+file_in <- here::here(path_start, "ELK", "ELKVEG2016.FINAL.xlsx")
+elk <- read_cdmo(file_in)
+bind_coords(elk)
+```
+
+#### KAC  
+
+had to add a 0 in the top QAQC column because otherwise it didn't get read in and caused problems.  
+
+```{r}
+file_in <- here::here(path_start, "KAC", "Recent data",
+                      "KACVEG2021.xlsx")
+kac <- read_cdmo(file_in)
+bind_coords(kac)
+```
+
+
+## Other long-format reserves  
+
+
+
+## NE project reserve packets  
+
+
+## Other wide-format reserves  
+
+
+
+
+# Number plots per reserve   
+
+See what we've got:  
+
+```{r}
+all_coords %>% 
+    group_by(Reserve) %>% 
+    tally() %>% 
+    knitr::kable()
+```
+
+# Map!  
+
+```{r, fig.height = 7, fig.width = 10}
+leaflet(all_coords) %>% 
+    addProviderTiles(providers$Esri.WorldImagery) %>% 
+    addCircles(lat = ~Lat, lng = ~Long,
+               color = "orange")
+```
+
+
+
