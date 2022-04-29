@@ -20,6 +20,7 @@ Really messy script to read in a single file for each reserve and pull GPS coord
 library(tidyverse)
 library(readxl)
 library(leaflet)
+library(rgdal)
 ```
 
 # Setup  
@@ -273,9 +274,90 @@ bind_coords(del_bcr)
 ```
 
 
+### LKS  
+
+```{r}
+file_in <- here::here(path_start, "LKS", "LKS NERR VegMonitoring 2014-2020_PROVISIONAL.xlsx")
+lks <- read_cdmo(file_in, worksheet = "2020") %>% 
+    rename(Lat = Latitude,
+           Long = Longitude)
+bind_coords(lks)
+```
+
+
+
 ## Other long-format reserves  
 
-HUD  
+### HUD - Tivoli  
+
+Coords use UTM-18  
+
+OTN 3B latitude is messed up (coming out as 23.99, which puts it in the Caribbean) - looks like the first digit was typed as a 2 and should have been a 4. Correcting here.    
+
+```{r}
+file_in <- here::here(path_start, "HUD", "HUD Tivoli Veg Data",
+                      "VegMon Data 2020.xlsx")
+prep <- read_xlsx(file_in, sheet = "Data Entry", n_max = 10)
+names(prep)[3:4] <- c("northing", "easting")
+hud_tiv <- read_xlsx(file_in, sheet = "Data Entry", skip = 2, col_names = FALSE)
+names(hud_tiv) <- names(prep)
+
+hud_tiv <- hud_tiv %>% 
+    mutate(northing = case_when(PlotID == "OTN-3B" ~ 4654284,
+                                TRUE ~ northing))
+rm(prep)
+
+points <- hud_tiv %>% 
+    select(easting, northing)
+# code below modified from stack overflow https://stackoverflow.com/a/30018607
+sputm <- SpatialPoints(points, proj4string=CRS("+proj=utm +zone=18 +datum=WGS84")) 
+spgeo <- spTransform(sputm, CRS("+proj=longlat +datum=WGS84"))
+lnlt <- data.frame(coordinates(spgeo))
+
+hud_tiv <- hud_tiv %>% 
+    mutate(Lat = lnlt$northing,
+           Long = lnlt$easting,
+           Reserve = "HUD",
+           SiteID = "TIV") %>% 
+    separate(PlotID, into = c("TransectID", "PlotID"), sep = "-") %>% 
+    select(Reserve, SiteID, TransectID, PlotID, Lat, Long, northing, easting)
+
+bind_coords(hud_tiv)
+```
+
+
+### HUD - Piermont  
+
+```{r}
+file_in <- here::here(path_start, "HUD", "HUD Piermont Veg Data",
+                      "Piermont VegMon Data 2020.xlsx")
+prep <- read_xlsx(file_in, sheet = "Data Entry", n_max = 10)
+names(prep)[5:6] <- c("northing", "easting")
+hud_pmn <- read_xlsx(file_in, sheet = "Data Entry", skip = 2, col_names = FALSE)
+names(hud_pmn) <- names(prep)
+rm(prep)
+
+hud_pmn <- hud_pmn %>% 
+    filter(!is.na(northing))
+
+points <- hud_pmn %>% 
+    select(easting, northing)
+# code below modified from stack overflow https://stackoverflow.com/a/30018607
+sputm <- SpatialPoints(points, proj4string=CRS("+proj=utm +zone=18 +datum=WGS84")) 
+spgeo <- spTransform(sputm, CRS("+proj=longlat +datum=WGS84"))
+lnlt <- data.frame(coordinates(spgeo))
+
+hud_pmn <- hud_pmn %>% 
+    mutate(Lat = lnlt$northing,
+           Long = lnlt$easting,
+           Reserve = "HUD") %>% 
+    separate(PlotID, into = c("TransectID", "SiteID", "PlotID"), sep = "-",
+             extra = "merge") %>% 
+    select(Reserve, SiteID, TransectID, PlotID, Lat, Long)
+
+bind_coords(hud_pmn)
+```
+
 
 ## NE project reserve packets  
 
@@ -293,10 +375,12 @@ bind_coords(grb)
 
 ### NAR  
 
-Latitude and Longitude columns are blank  
+Latitude and Longitude columns are blank; using CDMO 2012 instead    
 
 ```{r}
-file_in <- here::here(path_start, "NAR", "NAR Data Packet.xlsx")
+file_in <- here::here(path_start, "NAR", "NARVEG2012", "NARVEG2012.xlsx")
+nar <- read_cdmo(file_in)
+bind_coords(nar)
 ```
 
 
@@ -312,16 +396,30 @@ bind_coords(wel)
 
 ### WQB  
 
-lat/long blank  
+lat/long blank; using CDMO version instead  
+
+lat/long were switched for S4. Correcting here with code; watch out for it when moving data to new template.  
 
 ```{r}
-file_in <- here::here(path_start, "WQB", "WQB Data Packet 2011-2020.xlsx")
+file_in <- here::here(path_start, "WQB", "WQBVEG2016", "WQBVEG2016.xlsx")
+wqb <- read_cdmo(file_in)
+
+wqb2 <- wqb %>% filter(Lat < 0) %>% 
+    rename(Lat2 = Lat,
+           Long2 = Long) %>% 
+    rename(Lat = Long2,
+           Long = Lat2)
+
+wqb <- wqb %>% 
+    filter(Lat > 0) %>% 
+    bind_rows(wqb2)
+
+bind_coords(wqb)
 ```
 
 
 ## Other wide-format reserves  
-
-ACE, CBM-OPC, CBM-MB  
+ 
 
 ### ACE  
 
