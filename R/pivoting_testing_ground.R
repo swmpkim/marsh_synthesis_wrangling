@@ -32,4 +32,6 @@ covr_long <- pivot_longer(covr2,
                           names_to = c(".value", "Species"),
                           names_sep = "_")
 
-write.csv(covr_long, here::here("data", "cdmo_format_out", "cover_long.csv"), row.names = FALSE)
+write.csv(covr_long, here::here("data", "cdmo_format_out", "cover_long.csv"), 
+          row.names = FALSE,
+          na = "")
