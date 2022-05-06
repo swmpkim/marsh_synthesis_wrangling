@@ -1,0 +1,221 @@
+---
+title: "Pivoting and re-joining - GTM and NIW"
+author: "Kim Cressman"
+date: "5/6/2022"
+output: 
+    html_document:
+        toc: true
+        code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      warning = FALSE,
+                      message = FALSE)
+```
+
+```{r}
+library(tidyverse)
+library(readxl)
+
+# helper functions
+source(here::here("R", "sourced", "00_helper_functions.R"))
+
+# starting path for data
+path_start <- here::here("submitted_data", "data")
+```
+
+# NIW  
+
+In this file, 'Lat' is repeated in the 'Long' column for Segment B, Plot 3-3. Removing these before binding coords because it's only one plot; will need to fix before doing other analyses.  
+
+```{r}
+file_in <- here::here(path_start, "NIW", "NIWVEG2020.xlsx")
+niw <- read_cdmo(file_in) %>% 
+    filter(Long < 0)
+```
+
+
+We have files from 2006-2020, all starting with `NIWVEG` and ending with `.xlsx`.  
+
+```{r}
+niw_list <- list()
+
+# identify files to read - all of this condensed into the command below
+## all_files <- dir(here::here(path_start, "NIW"))
+## veg_files <- str_starts(all_files, "NIWVEG")
+## xlsx_files <- str_ends(all_files, ".xlsx")
+## veg_xlsx <- which(veg_files + xlsx_files == 2)
+## file_names <- all_files[veg_xlsx]
+
+res <- "NIW"
+
+all_files <- dir(here::here(path_start, res))
+file_names <- all_files[which(str_starts(all_files, paste0(res, "VEG")) + str_ends(all_files, ".xlsx") == 2)]
+
+for(i in seq_along(file_names)){
+    to_read <- file_names[i]
+    dat <- read_cdmo2(here::here(path_start, "NIW", to_read))
+    niw_list[[i]] <- dat
+}
+
+niw_all <- bind_rows(niw_list)
+unique(niw_all$Species)
+
+# get rid of species that are NA - some plots weren't sampled in 2015 because of boardwalk damage, so rows are there and there's a QAQC flag/code of -2 CSM (giving that explanation)  
+
+niw_all <- filter(niw_all, !is.na(Species))
+
+# how about QAQC codes? There are some -3 CSM and 1 CSMs in there
+# are these used by species?
+niw_all %>% 
+    group_by(SiteID, TransectID, PlotID, Date) %>% 
+    summarize(n_species = length(unique(Species)),
+              n_QAQC_codes = length(unique(QAQC))) %>% 
+    arrange(desc(n_QAQC_codes),
+            desc(n_species))
+
+# yes, they are, hm  
+```
+
+## QAQC FOR THESE PURPOSES  
+
+Because these will be example analyses, I'm going to exclude suspect and rejected data points without looking further - this is not what I want to do overall! Just in a rush right now.  
+
+```{r}
+excl <- c("<1> (CSM)", "<-3> (CSM)", "<1>  (CSM)")
+niw_qaqc <- niw_all %>% 
+    filter(!(QAQC %in% excl))
+
+niw_wide <- niw_qaqc %>% 
+    select(-QAQC, -Height, -Diameter) %>% 
+    pivot_wider(id_cols = Reserve:'Height Relative to MLLW',
+                names_from = Species,
+                values_from = Cover:'Average Canopy Height')
+```
+
+Split up data frames and pivot  
+
+```{r}
+niw_cover <- niw_qaqc %>% 
+    select(Reserve, SiteID, TransectID, PlotID, Subplot, Date,
+           Lat, Long, Species, Cover) %>% 
+    pivot_wider(names_from = Species,
+                values_from = Cover)
+
+niw_density <- niw_qaqc %>% 
+    select(Reserve, SiteID, TransectID, PlotID, Subplot, Date,
+           Lat, Long, Species, Density) %>% 
+    filter(!is.na(Density)) %>% 
+    mutate(Species = paste0("Density_", Species)) %>% 
+    pivot_wider(names_from = Species,
+                values_from = Density)
+
+niw_height <- niw_qaqc %>% 
+    select(Reserve, SiteID, TransectID, PlotID, Subplot, Date,
+           Lat, Long, Species, 'Maximum Canopy Height') %>% 
+    filter(!is.na('Maximum Canopy Height')) %>%
+    mutate(Species = paste0("Maximum Canopy Height_", Species)) %>% 
+    pivot_wider(names_from = Species,
+                values_from = 'Maximum Canopy Height')
+
+niw_all <- full_join(niw_cover, niw_density,
+                     by = c("Reserve", "SiteID", "TransectID",
+                            "PlotID", "Subplot", "Date",
+                            "Lat", "Long")) %>% 
+    full_join(., niw_height,
+              by = c("Reserve", "SiteID", "TransectID",
+                     "PlotID", "Subplot", "Date",
+                     "Lat", "Long"))
+
+write.csv(niw_all, here::here("data", "niw_namaste_template.csv"),
+          row.names = FALSE,
+          na = "")
+```
+
+Looks like NIW does ocular cover for the whole plot, and density/height in sub-plots. So there are 4 rows for each plot.  
+
+```{r}
+test <- niw_wide[1:12, ]
+test2 <- apply(test, MARGIN = 2, function(x) sum(!is.na(x)))
+data.frame(test2[test2 > 0])
+
+nrow(data.frame(test2[test2 > 0]))
+```
+
+
+
+# GTM  
+
+2015 data file has an extra "Sheet1" at the beginning. Would just delete but I don't want to have to modify original files downloaded from the google drive.  
+
+For GTM's files, the worksheet name matches the file name, so I'll use that.  
+
+```{r}
+# file_in <- here::here(path_start, "GTM", "GTMVEG2020.xlsx")
+# gtm <- read_cdmo(file_in)
+```
+
+```{r}
+gtm_list <- list()
+
+res <- "GTM"
+
+all_files <- dir(here::here(path_start, res))
+file_names <- all_files[which(str_starts(all_files, paste0(res, "VEG")) + str_ends(all_files, ".xlsx") == 2)]
+
+for(i in seq_along(file_names)){
+    to_read <- file_names[i]
+    sheets <- excel_sheets(here::here(path_start, res, to_read))
+    sheet_to_read <- str_subset(sheets, "GTM")
+    dat <- read_cdmo2(here::here(path_start, res, to_read),
+                      worksheet = sheet_to_read) %>% 
+        mutate(PlotID = as.numeric(PlotID))  # stored as character until 2020
+    gtm_list[[i]] <- dat
+    print(paste("finished", file_names[i]))
+}
+
+
+
+gtm_all <- bind_rows(gtm_list) %>% 
+    filter(!is.na(Species))
+unique(gtm_all$Species)
+unique(gtm_all$QAQC)
+View(filter(gtm_all, QAQC == "<-3> (CSM)"))
+
+gtm_qaqc <- gtm_all %>% 
+    filter(QAQC != "<-3> (CSM)")
+```
+
+```{r}
+gtm_cover <- gtm_qaqc %>% 
+    select(Reserve, SiteID, TransectID, PlotID, Date,
+           Lat, Long, Species, Cover) %>% 
+    pivot_wider(names_from = Species,
+                values_from = Cover)
+
+gtm_height <- gtm_qaqc %>% 
+    select(Reserve, SiteID, TransectID, PlotID, Date,
+           Lat, Long, Species, 'Canopy Height') %>% 
+    filter(!is.na('Canopy Height')) %>%
+    mutate(Species = paste0("Canopy Height_", Species)) %>% 
+    pivot_wider(names_from = Species,
+                values_from = 'Canopy Height')
+
+gtm_all <- full_join(gtm_cover, gtm_height,
+                     by = c("Reserve", "SiteID", "TransectID",
+                            "PlotID", "Date",
+                            "Lat", "Long")) 
+
+write.csv(gtm_all, here::here("data", "gtm_namaste_template.csv"),
+          row.names = FALSE,
+          na = "")
+```
+
+
+```{r}
+save(niw_qaqc, niw_cover, niw_density, niw_height,
+     gtm_qaqc, gtm_cover, gtm_height,
+     file = here::here("data", "NIW_GTM.RDS"))
+```
+
