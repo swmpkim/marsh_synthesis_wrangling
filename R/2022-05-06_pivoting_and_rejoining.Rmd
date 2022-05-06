@@ -23,6 +23,11 @@ source(here::here("R", "sourced", "00_helper_functions.R"))
 
 # starting path for data
 path_start <- here::here("submitted_data", "data")
+
+grouping_cols <- c("Reserve", "SiteID", "TransectID", "PlotID", "Subplot", "Date")
+grouping_cols2 <- c("Reserve", "SiteID", "TransectID", "PlotID", "Date")
+other_id_cols <- c("Lat", "Long", "Distance", "Orthometric Height",
+                   "Height Relative to MLLW")
 ```
 
 # NIW  
@@ -59,21 +64,21 @@ for(i in seq_along(file_names)){
     niw_list[[i]] <- dat
 }
 
-niw_all <- bind_rows(niw_list)
+niw_long <- bind_rows(niw_list)
 unique(niw_all$Species)
 
 # get rid of species that are NA - some plots weren't sampled in 2015 because of boardwalk damage, so rows are there and there's a QAQC flag/code of -2 CSM (giving that explanation)  
 
-niw_all <- filter(niw_all, !is.na(Species))
+niw_long <- filter(niw_long, !is.na(Species))
 
-# how about QAQC codes? There are some -3 CSM and 1 CSMs in there
-# are these used by species?
-niw_all %>% 
-    group_by(SiteID, TransectID, PlotID, Date) %>% 
-    summarize(n_species = length(unique(Species)),
-              n_QAQC_codes = length(unique(QAQC))) %>% 
-    arrange(desc(n_QAQC_codes),
-            desc(n_species))
+# # how about QAQC codes? There are some -3 CSM and 1 CSMs in there
+# # are these used by species?
+# niw_long %>% 
+#     group_by(SiteID, TransectID, PlotID, Date) %>% 
+#     summarize(n_species = length(unique(Species)),
+#               n_QAQC_codes = length(unique(QAQC))) %>% 
+#     arrange(desc(n_QAQC_codes),
+#             desc(n_species))
 
 # yes, they are, hm  
 ```
@@ -84,63 +89,62 @@ Because these will be example analyses, I'm going to exclude suspect and rejecte
 
 ```{r}
 excl <- c("<1> (CSM)", "<-3> (CSM)", "<1>  (CSM)")
-niw_qaqc <- niw_all %>% 
+niw_qaqc <- niw_long %>% 
     filter(!(QAQC %in% excl))
 
-niw_wide <- niw_qaqc %>% 
-    select(-QAQC, -Height, -Diameter) %>% 
-    pivot_wider(id_cols = Reserve:'Height Relative to MLLW',
-                names_from = Species,
-                values_from = Cover:'Average Canopy Height')
+# niw_wide <- niw_qaqc %>% 
+#     select(-QAQC, -Height, -Diameter) %>% 
+#     pivot_wider(id_cols = all_of(grouping_cols),
+#                 names_from = Species,
+#                 values_from = Cover:'Average Canopy Height')
 ```
 
-Split up data frames and pivot  
+Split up data frames and pivot. For NIW, am averaging everything from a single plot together, disregarding NAs. This should average the three replicates for height, and single value for cover, etc.    
 
 ```{r}
 niw_cover <- niw_qaqc %>% 
-    select(Reserve, SiteID, TransectID, PlotID, Subplot, Date,
-           Lat, Long, Species, Cover) %>% 
+    select(all_of(grouping_cols), Species, Cover) %>% 
     pivot_wider(names_from = Species,
                 values_from = Cover)
 
 niw_density <- niw_qaqc %>% 
-    select(Reserve, SiteID, TransectID, PlotID, Subplot, Date,
-           Lat, Long, Species, Density) %>% 
+    select(all_of(grouping_cols), Species, Density) %>% 
     filter(!is.na(Density)) %>% 
     mutate(Species = paste0("Density_", Species)) %>% 
     pivot_wider(names_from = Species,
                 values_from = Density)
 
 niw_height <- niw_qaqc %>% 
-    select(Reserve, SiteID, TransectID, PlotID, Subplot, Date,
-           Lat, Long, Species, 'Maximum Canopy Height') %>% 
+    select(all_of(grouping_cols), Species, 'Maximum Canopy Height') %>% 
     filter(!is.na('Maximum Canopy Height')) %>%
     mutate(Species = paste0("Maximum Canopy Height_", Species)) %>% 
     pivot_wider(names_from = Species,
                 values_from = 'Maximum Canopy Height')
 
-niw_all <- full_join(niw_cover, niw_density,
-                     by = c("Reserve", "SiteID", "TransectID",
-                            "PlotID", "Subplot", "Date",
-                            "Lat", "Long")) %>% 
+niw_other_id <- niw_qaqc %>% 
+    select(all_of(grouping_cols), all_of(other_id_cols)) %>% 
+    distinct()
+
+niw_all <- full_join(niw_other_id, niw_cover,
+                     by = all_of(grouping_cols)) %>% 
+    full_join(., niw_density,
+              by = all_of(grouping_cols)) %>% 
     full_join(., niw_height,
-              by = c("Reserve", "SiteID", "TransectID",
-                     "PlotID", "Subplot", "Date",
-                     "Lat", "Long"))
+              by = all_of(grouping_cols)) %>% 
+    select(-Subplot) %>% 
+    group_by(Date, Reserve, SiteID, TransectID, PlotID) %>% 
+    summarize(across(Lat:"Maximum Canopy Height_Ipomoea sagittata",
+              ~mean(.x, na.rm = TRUE))) %>% 
+    ungroup() %>% 
+    select(Reserve, SiteID, TransectID, PlotID, Date, 
+           all_of(other_id_cols), 
+           everything())
+        
+    
 
 write.csv(niw_all, here::here("data", "niw_namaste_template.csv"),
           row.names = FALSE,
           na = "")
-```
-
-Looks like NIW does ocular cover for the whole plot, and density/height in sub-plots. So there are 4 rows for each plot.  
-
-```{r}
-test <- niw_wide[1:12, ]
-test2 <- apply(test, MARGIN = 2, function(x) sum(!is.na(x)))
-data.frame(test2[test2 > 0])
-
-nrow(data.frame(test2[test2 > 0]))
 ```
 
 
@@ -177,35 +181,46 @@ for(i in seq_along(file_names)){
 
 
 
-gtm_all <- bind_rows(gtm_list) %>% 
+gtm_long <- bind_rows(gtm_list) %>% 
     filter(!is.na(Species))
-unique(gtm_all$Species)
-unique(gtm_all$QAQC)
-View(filter(gtm_all, QAQC == "<-3> (CSM)"))
+unique(gtm_long$Species)
+unique(gtm_long$QAQC)
+# View(filter(gtm_long, QAQC == "<-3> (CSM)"))
 
-gtm_qaqc <- gtm_all %>% 
+gtm_qaqc <- gtm_long %>% 
     filter(QAQC != "<-3> (CSM)")
 ```
 
 ```{r}
 gtm_cover <- gtm_qaqc %>% 
-    select(Reserve, SiteID, TransectID, PlotID, Date,
-           Lat, Long, Species, Cover) %>% 
+    select(all_of(grouping_cols2), Species, Cover) %>% 
     pivot_wider(names_from = Species,
                 values_from = Cover)
 
+gtm_density <- gtm_qaqc %>% 
+    select(all_of(grouping_cols2), Species, Density) %>% 
+    filter(!is.na(Density)) %>% 
+    mutate(Species = paste0("Density_", Species)) %>% 
+    pivot_wider(names_from = Species,
+                values_from = Density)
+
 gtm_height <- gtm_qaqc %>% 
-    select(Reserve, SiteID, TransectID, PlotID, Date,
-           Lat, Long, Species, 'Canopy Height') %>% 
+    select(all_of(grouping_cols2), Species, 'Canopy Height') %>% 
     filter(!is.na('Canopy Height')) %>%
     mutate(Species = paste0("Canopy Height_", Species)) %>% 
     pivot_wider(names_from = Species,
                 values_from = 'Canopy Height')
 
-gtm_all <- full_join(gtm_cover, gtm_height,
-                     by = c("Reserve", "SiteID", "TransectID",
-                            "PlotID", "Date",
-                            "Lat", "Long")) 
+gtm_other_id <- gtm_qaqc %>% 
+    select(all_of(grouping_cols2), all_of(other_id_cols)) %>% 
+    distinct()
+
+gtm_all <- full_join(gtm_other_id, gtm_cover, 
+                     by = all_of(grouping_cols2)) %>% 
+    full_join(., gtm_density, 
+                     by = all_of(grouping_cols2)) %>% 
+    full_join(., gtm_height, 
+                     by = all_of(grouping_cols2))
 
 write.csv(gtm_all, here::here("data", "gtm_namaste_template.csv"),
           row.names = FALSE,
@@ -214,8 +229,8 @@ write.csv(gtm_all, here::here("data", "gtm_namaste_template.csv"),
 
 
 ```{r}
-save(niw_qaqc, niw_cover, niw_density, niw_height,
-     gtm_qaqc, gtm_cover, gtm_height,
+save(niw_all, niw_qaqc, niw_cover, niw_density, niw_height,
+     gtm_all, gtm_qaqc, gtm_cover, gtm_density, gtm_height,
      file = here::here("data", "NIW_GTM.RDS"))
 ```
 
