@@ -21,11 +21,12 @@ library(tidyverse)
 library(readxl)
 library(leaflet)
 library(rgdal)
+library(stringi)  # for stri_sub_replace()
 ```
 
 # Setup  
 
-## Output prep  
+### Output prep  
 
 ```{r}
 all_coords <- tibble(Reserve = character(),
@@ -35,7 +36,7 @@ all_coords <- tibble(Reserve = character(),
 ```
 
 
-## Helpful functions  
+### Helpful functions  
 
 Because I'll be doing this repetitively on similar data files....  
 
@@ -48,11 +49,11 @@ source(here::here("R", "sourced", "00_helper_functions.R"))
 
 
 
-## Reserve-by-reserve  
+# Reserve-by-reserve  
 
-### CDMO-formatted data  
+## CDMO-formatted data  
 
-#### APA  
+### APA  
 
 ```{r}
 file_in <- here::here(path_start, "APA", "Data", "APAVEG2020MOD.xlsx")
@@ -60,7 +61,7 @@ apa <- read_cdmo(file_in)
 bind_coords(apa)
 ```
 
-#### CBM - Jug Bay  
+### CBM - Jug Bay  
 
 ```{r}
 file_in <- here::here(path_start, "CBM", "Veg", "Jug Bay",
@@ -72,7 +73,7 @@ bind_coords(cbm_jb)
 
 
 
-#### CBV  
+### CBV  
 
 had to add "Other" as a column name in the file because there was text lower down in the column and this caused problems later.    
 
@@ -82,7 +83,7 @@ cbv <- read_cdmo(file_in)
 bind_coords(cbv)
 ```
 
-#### JAC  
+### JAC  
 
 ```{r}
 file_in <- here::here(path_start, "JAC", "2021", "JAC 2021 Marsh Vegetation.xlsx")
@@ -91,7 +92,7 @@ bind_coords(jac)
 ```
 
 
-#### NIW  
+### NIW  
 
 In this file, 'Lat' is repeated in the 'Long' column for Segment B, Plot 3-3. Removing these before binding coords because it's only one plot; will need to fix before doing other analyses.  
 
@@ -103,7 +104,7 @@ bind_coords(niw)
 ```
 
 
-#### GTM  
+### GTM  
 
 ```{r}
 file_in <- here::here(path_start, "GTM", "GTMVEG2020.xlsx")
@@ -111,7 +112,7 @@ gtm <- read_cdmo(file_in)
 bind_coords(gtm)
 ```
 
-#### NOC  
+### NOC  
 
 Separate folders for different reserve components.  
 
@@ -142,7 +143,7 @@ bind_coords(noc_zi)
 ```
 
 
-#### GND  
+### GND  
 
 ```{r}
 file_in <- here::here(path_start, "GND", "Veg Data and Metadata",
@@ -152,7 +153,7 @@ bind_coords(gnd)
 ```
 
 
-#### MAR  
+### MAR  
 
 Somethings weird with these coordinates; they're not making transects when all coords for a plot are averaged together.  
 
@@ -163,7 +164,7 @@ mar <- read_cdmo(file_in)
 bind_coords(mar)
 ```
 
-#### ELK  
+### ELK  
 
 ```{r}
 file_in <- here::here(path_start, "ELK", "ELKVEG2016.FINAL.xlsx")
@@ -171,7 +172,7 @@ elk <- read_cdmo(file_in)
 bind_coords(elk)
 ```
 
-#### KAC  
+### KAC  
 
 had to add a 0 in the top QAQC column because otherwise it didn't get read in and caused problems.  
 
@@ -183,7 +184,7 @@ bind_coords(kac)
 ```
 
 
-#### SOS  
+### SOS  
 
 CDMO format, but different years in different worksheets. Will have to specify worksheet.  
 
@@ -206,7 +207,7 @@ bind_coords(sos)
 ```
 
 
-#### DEL  
+### DEL  
 
 CDMO format, but different reserve components in different worksheets. Will have to specify worksheet.  
 
@@ -325,10 +326,37 @@ bind_coords(grb)
 
 Latitude and Longitude columns are blank; using CDMO 2012 instead    
 
+It seems that what's in the lat/long columns here was actually degrees-minutes-seconds format, entered into the decimal degree field. So I need to do some separating and converting.  
+
 ```{r}
 file_in <- here::here(path_start, "NAR", "NARVEG2012", "NARVEG2012.xlsx")
 nar <- read_cdmo(file_in)
-bind_coords(nar)
+```
+
+
+```{r}
+nar_coords <- nar %>% 
+    select(Reserve, SiteID, TransectID, PlotID, Lat, Long) %>% 
+    distinct() %>% 
+    mutate_all(as.character) %>% 
+    separate(Lat, into = c("Lat_deg", "Lat_min"), sep = "[.]") %>% 
+    separate(Long, into = c("Long_deg", "Long_min"), sep = "[.]") %>% 
+    mutate(Lat_min = stri_sub_replace(Lat_min, 3, 2, value = "."),
+           Long_min = stri_sub_replace(Long_min, 3, 2, value = ".")) %>% 
+    separate(Lat_min, into = c("Lat_min", "Lat_sec"), sep = "[.]") %>% 
+    separate(Long_min, into = c("Long_min", "Long_sec"), sep = "[.]") %>% 
+    mutate(Lat_sec = stri_sub_replace(Lat_sec, 3, 2, value = "."),
+           Long_sec = stri_sub_replace(Long_sec, 3, 2, value = ".")) %>% 
+    mutate(across(c(Lat_deg, Lat_min, Lat_sec, 
+                    Long_deg, Long_min, Long_sec), 
+                  as.numeric)) %>% 
+    mutate(Lat = round(Lat_deg + (Lat_min/60) + (Lat_sec/3600), 5),
+           Long = round(-1*((-1*Long_deg) + (Long_min/60) + (Long_sec/3600)), 5))
+
+nar2 <- nar_coords %>% 
+    mutate(across(c(TransectID, PlotID), as.numeric))
+
+bind_coords(nar2)
 ```
 
 
@@ -468,26 +496,6 @@ bind_coords(cbm_mb)
 ```
 
 
-```{r}
-test_coords <- data.frame(
-    Reserve = rep("NAR_SETr", 6),
-    SiteID = rep("COG", 6),
-    TransectID = rep("T1", 6),
-    PlotID = c("Cog 7", "Cog 8", "Cog 9", "Cog 10", "Cog 11", "Cog 12"),
-    Lat = c(41.6502, 41.6497, 41.6508, 41.6507, 41.6531, 41.6528),
-    Long = c(-71.342882, -71.342576, -71.340844, -71.340062, -71.342866, -71.343)
-    )
-test_coords <- bind_rows(test_coords, all_coords)
-```
-
-```{r, fig.height = 7, fig.width = 10}
-leaflet(test_coords) %>% 
-    addProviderTiles(providers$Esri.WorldImagery) %>% 
-    addCircles(lat = ~Lat, lng = ~Long,
-               color = "orange",
-               popup = ~paste(Reserve, SiteID, sep = "-")) %>% 
-    addScaleBar()
-```
 
 # Number plots per reserve   
 
@@ -507,7 +515,8 @@ leaflet(all_coords) %>%
     addProviderTiles(providers$Esri.WorldImagery) %>% 
     addCircles(lat = ~Lat, lng = ~Long,
                color = "orange",
-               popup = ~paste(Reserve, SiteID, sep = "-")) %>% 
+               popup = ~paste(Reserve, SiteID, TransectID, PlotID,
+                              sep = "-")) %>% 
     addScaleBar()
 ```
 

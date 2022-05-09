@@ -77,7 +77,8 @@ read_cdmo2 <- function(file,
 ## don't do this twice; it doesn't check to see if these coordinates are already there
 bind_coords <- function(df){
     to_bind <- df %>% 
-        select(Reserve, SiteID, TransectID, PlotID, Lat, Long) %>% 
+        select(Reserve, SiteID, TransectID, PlotID, Lat, Long) %>%
+        mutate_all(as.character) %>% 
         filter(Lat != "NA") %>% 
         mutate(Lat = str_trim(Lat),
                Long = str_trim(Long),
@@ -87,7 +88,7 @@ bind_coords <- function(df){
         summarize(Lat = round(mean(Lat, na.rm = TRUE), 5),
                   Long = round(mean(Long, na.rm = TRUE), 5)) %>% 
         ungroup() %>% 
-        select(Reserve, SiteID, Lat, Long)
+        select(Reserve, SiteID, TransectID, PlotID, Lat, Long)
     all_coords <<- bind_rows(all_coords, to_bind)  
     cat(paste(nrow(to_bind), "rows have been added to `all_coords`"))
 }
