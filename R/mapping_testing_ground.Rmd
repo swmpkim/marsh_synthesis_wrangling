@@ -5,6 +5,7 @@ date: "4/28/2022"
 output: 
     html_document:
         toc: true
+        toc_depth: 2
         code_folding: hide
 ---
 
@@ -63,11 +64,20 @@ bind_coords(apa)
 
 ### CBM - Jug Bay  
 
+There seems to be a longitude typo at RR-T2-P5; first two digits past decimal are .77 but for other plots are .71. In first maps, using these coords (.77), P5 was quite far away from the rest of the transect. Fixing in code.  
+
+-76.77092 --> -76.71092
+
 ```{r}
 file_in <- here::here(path_start, "CBM", "Veg", "Jug Bay",
                       "CDMO EV Data.xlsx")
 cbm_jb <- read_cdmo(file_in, worksheet = "2020") %>% 
-    mutate(Long = -1 * Long)
+    select(Reserve, SiteID, TransectID, PlotID, Lat, Long) %>% 
+    distinct() %>% 
+    mutate(Long = -1 * Long,
+           Long = case_when(Long == -76.77092 ~ -76.71092,
+                            TRUE ~ Long)) 
+
 bind_coords(cbm_jb)
 ```
 
@@ -478,23 +488,44 @@ cbm_mb <- cbm_mb %>%
 
 # convert gps coordinates
 cbm_mb <- cbm_mb %>% 
-    mutate(Lat_dms = str_replace_all(Lat_dms, "[^[:digit:][\\.]]+", " "),
-           Lat_dms = str_trim(Lat_dms),
-           Long_dms = str_replace_all(Long_dms, "[^[:digit:][\\.]]+", " "),
-           Long_dms = str_trim(Long_dms)) %>% 
-    separate(Lat_dms, into = c("Lat_deg", "Lat_min", "Lat_sec"),
+    mutate(Lat_dms2 = str_replace_all(Lat_dms, "[^[:digit:][\\.]]+", " "),
+           Lat_dms2 = str_trim(Lat_dms2),
+           Long_dms2 = str_replace_all(Long_dms, "[^[:digit:][\\.]]+", " "),
+           Long_dms2 = str_trim(Long_dms2)) %>% 
+    separate(Lat_dms2, into = c("Lat_deg", "Lat_min", "Lat_sec"),
              sep = " ") %>% 
-    separate(Long_dms, into = c("Long_deg", "Long_min", "Long_sec"),
+    separate(Long_dms2, into = c("Long_deg", "Long_min", "Long_sec"),
              sep = " ") %>% 
     mutate(across(Lat_deg:Long_sec,
                   as.numeric)) %>% 
     mutate(Lat = round(Lat_deg + (Lat_min/60) + (Lat_sec/3600), 5),
-           Long = round(-1*(Long_deg + (Long_min/60) + (Long_sec/3600)), 5)) %>% 
-    select(Reserve, SiteID, TransectID, PlotID, Lat, Long)
+           Long = round(-1*(Long_deg + (Long_min/60) + (Long_sec/3600)), 5))  # %>% 
+    # select(Reserve, SiteID, TransectID, PlotID, Lat, Long)
 
+write.csv(cbm_mb, here::here("data", "CBM-MB gps coords.csv"), row.names = FALSE)
+```
+
+```{r}
+leaflet(cbm_mb) %>% 
+    addProviderTiles(providers$Esri.WorldImagery) %>% 
+    addCircles(lat = ~Lat, lng = ~Long,
+               color = "orange",
+               popup = ~paste(Reserve, SiteID, TransectID, PlotID,
+                              sep = "-")) %>% 
+    addScaleBar()
+```
+
+
+```{r}
 bind_coords(cbm_mb)
 ```
 
+Write out a csv of all coordinates:  
+
+```{r}
+write.csv(all_coords, here::here("data", "all_plot_locations.csv"),
+          row.names = FALSE)
+```
 
 
 # Number plots per reserve   
