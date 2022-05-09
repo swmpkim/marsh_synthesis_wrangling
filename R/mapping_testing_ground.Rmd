@@ -461,6 +461,8 @@ bind_coords(cbm_opc)
 
 ### CBM - Monie Bay  
 
+Appears to be old typo for MCMST3 P2 and P5. Per Kyle: I would be willing to bet if you changed say, P2 from 48.6 to 46.6 it would line up.  
+
 ```{r}
 file_in <- here::here(path_start, "CBM", "Veg", "Monie Bay", 
                       "MASTER MBR_EV_Transect_Data_Current_2017.xlsx")
@@ -485,28 +487,31 @@ cbm_mb <- cbm_mb %>%
            TransectID = Transect,
            PlotID = Plot,
            Lat_dms, Long_dms)
+```
 
+# KYLE CLICK HERE FOR YOUR MAP   
+
+```{r}
 # convert gps coordinates
-cbm_mb <- cbm_mb %>% 
+cbm_mb2 <- cbm_mb %>% 
     mutate(Lat_dms2 = str_replace_all(Lat_dms, "[^[:digit:][\\.]]+", " "),
            Lat_dms2 = str_trim(Lat_dms2),
            Long_dms2 = str_replace_all(Long_dms, "[^[:digit:][\\.]]+", " "),
-           Long_dms2 = str_trim(Long_dms2)) %>% 
+           Long_dms2 = str_trim(Long_dms2),
+           ID = paste(TransectID, PlotID, sep = "-")) %>% 
     separate(Lat_dms2, into = c("Lat_deg", "Lat_min", "Lat_sec"),
              sep = " ") %>% 
     separate(Long_dms2, into = c("Long_deg", "Long_min", "Long_sec"),
              sep = " ") %>% 
     mutate(across(Lat_deg:Long_sec,
                   as.numeric)) %>% 
+    mutate(Lat_sec = case_when(ID == "MCMST3-P2" ~ 46.9,
+                               ID == "MCMST3-P5" ~ 47.8,
+                               TRUE ~ Lat_sec)) %>% 
     mutate(Lat = round(Lat_deg + (Lat_min/60) + (Lat_sec/3600), 5),
-           Long = round(-1*(Long_deg + (Long_min/60) + (Long_sec/3600)), 5))  # %>% 
-    # select(Reserve, SiteID, TransectID, PlotID, Lat, Long)
+           Long = round(-1*(Long_deg + (Long_min/60) + (Long_sec/3600)), 5))  
 
-write.csv(cbm_mb, here::here("data", "CBM-MB gps coords.csv"), row.names = FALSE)
-```
-
-```{r}
-leaflet(cbm_mb) %>% 
+leaflet(cbm_mb2) %>% 
     addProviderTiles(providers$Esri.WorldImagery) %>% 
     addCircles(lat = ~Lat, lng = ~Long,
                color = "orange",
@@ -515,9 +520,12 @@ leaflet(cbm_mb) %>%
     addScaleBar()
 ```
 
+```{r}
+write.csv(cbm_mb2, here::here("data", "CBM-MB gps coords.csv"), row.names = FALSE)
+```
 
 ```{r}
-bind_coords(cbm_mb)
+bind_coords(cbm_mb2)
 ```
 
 Write out a csv of all coordinates:  
