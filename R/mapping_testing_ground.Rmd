@@ -104,12 +104,22 @@ bind_coords(jac)
 
 ### NIW  
 
-In this file, 'Lat' is repeated in the 'Long' column for Segment B, Plot 3-3. Removing these before binding coords because it's only one plot; will need to fix before doing other analyses.  
+In this file, 'Lat' is repeated in the 'Long' column for Segment B, Plot 3-3. 
+
+Per email with Tracy on 5/16/22, coordinates for this plot are:  
+33.34045339	-79.2030272  
+
 
 ```{r}
 file_in <- here::here(path_start, "NIW", "NIWVEG2020.xlsx")
 niw <- read_cdmo(file_in) %>% 
-    filter(Long < 0)
+    mutate(id = paste(SiteID, TransectID, PlotID, sep = "-"),
+           Lat = case_when(id == "Segment B-3-3" ~ 33.34045339,
+                           TRUE ~ Lat),
+           Long = case_when(id == "Segment B-3-3" ~ -79.2030272,
+                            TRUE ~ Long))
+
+
 bind_coords(niw)
 ```
 
@@ -487,11 +497,7 @@ cbm_mb <- cbm_mb %>%
            TransectID = Transect,
            PlotID = Plot,
            Lat_dms, Long_dms)
-```
 
-# KYLE CLICK HERE FOR YOUR MAP   
-
-```{r}
 # convert gps coordinates
 cbm_mb2 <- cbm_mb %>% 
     mutate(Lat_dms2 = str_replace_all(Lat_dms, "[^[:digit:][\\.]]+", " "),
@@ -510,19 +516,8 @@ cbm_mb2 <- cbm_mb %>%
                                TRUE ~ Lat_sec)) %>% 
     mutate(Lat = round(Lat_deg + (Lat_min/60) + (Lat_sec/3600), 5),
            Long = round(-1*(Long_deg + (Long_min/60) + (Long_sec/3600)), 5))  
-
-leaflet(cbm_mb2) %>% 
-    addProviderTiles(providers$Esri.WorldImagery) %>% 
-    addCircles(lat = ~Lat, lng = ~Long,
-               color = "orange",
-               popup = ~paste(Reserve, SiteID, TransectID, PlotID,
-                              sep = "-")) %>% 
-    addScaleBar()
 ```
 
-```{r}
-write.csv(cbm_mb2, here::here("data", "CBM-MB gps coords.csv"), row.names = FALSE)
-```
 
 ```{r}
 bind_coords(cbm_mb2)
