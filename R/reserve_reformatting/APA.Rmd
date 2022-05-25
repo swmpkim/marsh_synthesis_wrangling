@@ -46,6 +46,7 @@ path_start <- here::here("submitted_data", "data", "APA", "Data")
 path_out <- here::here("wrangled_data", "APA")
 ```
 
+## Read and combine data  
 
 What are the files?  
 
@@ -73,6 +74,26 @@ for(i in seq_along(to_read)){
 dat_all <- bind_rows(dat_in)
 ```
 
+# CDMO formatted input  
+
+## Check station/plot names  
+
+```{r}
+unique(dat_all$Reserve)
+dat_all %>% 
+    select(Reserve, SiteID, TransectID, PlotID) %>% 
+    distinct() %>% 
+    knitr::kable()
+```
+
+
+Fix any issues here.  
+
+```{r}
+dat_all <- dat_all %>% 
+    mutate(Reserve = case_when(Reserve != "APA" ~ "APA",
+                               TRUE ~ Reserve))
+```
 
 
 ## Column wrangling  
@@ -166,19 +187,222 @@ dat_cdmo <- dat_all %>%
     )
 ```
 
-Write the CDMO data frame to a file.  
+
+## Quality Checks  
+
+```{r}
+dat_cdmo %>% 
+    select(Reserve:Species, QAQC) %>%
+    janitor::get_dupes() %>% 
+    View()
+
+# suspect the 2nd instance of this should have been PlotID = 7 and this was a typo  
+dat_cdmo %>% 
+    filter(SiteID == "PC",
+           TransectID == 3,
+           PlotID == 5,
+           Species == "Symphyotrichum tenuifolium") %>% 
+    View()
+
+
+# actual different values entered for this one: cover is 0.1 vs 20;
+# average canopy height NA vs. 1.65 
+dat_cdmo %>% 
+    filter(SiteID == "LSM",
+           TransectID == 1,
+           PlotID == 4,
+           Species == "Spartina cynosuroides") %>% 
+    View()
+```
+
+```{r}
+stn_dupes <- dat_cdmo %>% 
+    select(Reserve, SiteID, TransectID, PlotID,
+           Distance) %>% 
+    distinct() %>% 
+    janitor::get_dupes(-Distance)
+
+dat_cdmo %>% 
+    select(Reserve, SiteID, TransectID, PlotID,
+           Distance) %>% 
+    distinct() %>% 
+    filter(SiteID == "PC", TransectID == 2)
+# Pretty sure the Distance of 60 is the typo. How often does it show up?  
+
+dat_cdmo %>% 
+    select(SiteID, TransectID, PlotID,
+           Distance) %>% 
+    filter(SiteID == "PC", TransectID == 2) %>% 
+    group_by(SiteID, TransectID, PlotID,
+           Distance) %>% 
+    tally()
+
+# only shows up once; okay will change that to 80
+# where is it though
+dat_cdmo %>% 
+    filter(SiteID == "PC", TransectID == 2,
+           PlotID == 5, Distance == 60) %>% 
+    View()
+
+# 4/23/2018, Juncus roemerianus
+```
+
+## Correct discrepancies.  
+
+1.  04/07/2015, PC, Transect 3, Plot 5, Symphyotrichum tenuifolium. Rows 412 and 423 in the [uncorrected] APA_CDMO.xlsx spreadsheet; I believe row 423 should be plot 7 rather than 5. This is row 422 in the current data frame. Hardcoding it is giving me heartburn but it's the best I can do right now.  
+
+Lat and Long were also copied in for Plot 5 so are corrected here as well.  
+
+29.59603
+-85.02567
+
+```{r}
+dat_cdmo$PlotID[422] <- 7
+dat_cdmo$Lat[422] <- 29.59603
+dat_cdmo$Long[422] <- -85.02567
+```
+
+
+2.  10/03/2016, LSM, Transect 1, Plot 4 has two rows for Spartina cynosuroides. I don’t think this is a plot typo, but cover and density are different between the two rows – so maybe a species typo? It’s rows 907 and 908 in the [uncorrected] APA_CDMO spreadsheet: rows 906 and 907 in the data frame.   
+
+```{r}
+
+```
+
+
+3.  Distance of 60 at PC-2-5 on 4/23/2018. Row 1617 in data frame.    
+
+```{r}
+dat_cdmo$Distance[1617] <- 80
+```
+
+
+
+## Write the CDMO data frame to a file.  
 
 ```{r}
 write_xlsx(dat_cdmo, path = here::here(path_out, "APA_CDMO.xlsx"),
            format_headers = TRUE)
 ```
 
+
+# NaMaSTe tables  
+
+## Set up the station table  
+
+Get rid of any NAs in lat/long; we want station characteristics.  
+
 ```{r}
-all_coords <- tibble(Reserve = character(),
-                     SiteID = character(),
-                     Lat = numeric(),
-                     Long = numeric())
+station_table <- dat_cdmo %>% 
+    select(Reserve,
+           SiteID,
+           TransectID,
+           PlotID,
+           Lat,
+           Long,
+           Type,
+           "SSAM-1") %>% 
+    filter(!is.na(Lat),
+           !is.na(Long)) %>% 
+    distinct()
 ```
+
+Do any plots have multiple rows?  
+
+This code led me to find incorrect Lat/Long assoicated with an incorrect plot ID; corrected up above so this code should no longer turn up problems.  
+
+```{r}
+station_table %>% 
+    group_by(Reserve, SiteID, TransectID, PlotID) %>% 
+    tally() %>% 
+    arrange(desc(n)) %>% 
+    knitr::kable()
+
+# PC-3-7 had multiple  
+station_table %>% 
+    group_by(Reserve, SiteID, TransectID, PlotID) %>% 
+    filter(SiteID == "PC", TransectID == 3, PlotID == 7) %>% 
+    View()
+
+dat_cdmo %>% 
+    select(Reserve, SiteID, TransectID, PlotID, Lat, Long) %>% 
+    filter(SiteID == "PC", TransectID == 3, PlotID == 7) %>% 
+    group_by(Reserve, SiteID, TransectID, PlotID, Lat, Long) %>% 
+    tally() %>% 
+    View()
+```
+
+Uncorrected version (has been updated):  
+
+Slightly different coordinates for Lat/Long at PC-3-7.  
+
+Only one instance of these coordinates: 29.59617
+-85.02579
+
+And 85 of these: 29.59603
+-85.02567
+
+I suspect a typo.  
+
+```{r}
+dat_cdmo %>% 
+    select(Reserve, SiteID, TransectID, PlotID, Date, Lat, Long) %>% 
+    filter(Lat == 29.59617) %>% 
+    View()
+```
+
+Yes, those are coordinates for Plot 5. And it's 4/7/2015, when the plotID typo existed. Need to change those coordinates too then. (Note: updated above.)   
+
+
+
+
+
+Are all stations actually represented? If the below output is FALSE, there's a problem to fix. If TRUE, proceed.     
+
+```{r}
+stns_all <- dat_cdmo %>% 
+    select(Reserve, SiteID, TransectID, PlotID) %>% 
+    distinct()
+
+nrow(stns_all) == nrow(station_table)
+```
+
+
+## Cover worksheet  
+
+```{r}
+cvr <- dat_cdmo %>% 
+    select(Reserve:Cover) %>% 
+    pivot_wider(names_from = Species,
+                values_from = Cover)
+
+cvr_qaqc <- dat_cdmo %>% 
+    select(Reserve:Species, QAQC) %>%
+    pivot_wider(names_from = Species,
+                names_prefix = "F_",
+                values_from = QAQC)
+
+
+
+```
+
+
+```{r}
+# mutate(Date = lubridate::mdy(Date),
+#            Year = lubridate::year(Date),
+#            Month = lubridate::month(Date),
+#            Day = lubridate::mday(Date)) %>% 
+#     select(-Date) %>% 
+```
+
+
+
+## Supplement the station table  
+
+Pull out the earliest Orthometric Height, Height at MLLW, Distance to Water, and Distance along transect, if they exist.  
+
+For APA, there is a `Distance` column, which corresponds to the NaMaSTe `Distance_along_Transect` column.  
+
 
 
 

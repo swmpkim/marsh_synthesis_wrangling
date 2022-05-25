@@ -63,7 +63,7 @@ to_read <- dir(path_start)[]
 
 Read into a list and combine  **MODIFY FOR DIFFERENT DATA TYPES**  
 
-# CDMO formatted files to start  
+# CDMO formatted input  
 
 This section will compile code to read in and combine files that are already in CDMO format. Then a long CDMO-format file will be generated, after reconciling column names, dates, and putting things in order. The NaMaSTe template file will be generated from the CDMO-format file.  
 
@@ -75,6 +75,24 @@ for(i in seq_along(to_read)){
 }
 
 dat_all <- bind_rows(dat_in)
+```
+
+
+## Check station/plot names  
+
+```{r}
+unique(dat_all$Reserve)
+dat_all %>% 
+    select(Reserve, SiteID, TransectID, PlotID) %>% 
+    distinct() %>% 
+    knitr::kable()
+```
+
+
+Fix any issues here.  
+
+```{r}
+
 ```
 
 
@@ -157,7 +175,28 @@ dat_cdmo <- dat_all %>%
     )
 ```
 
-Write the CDMO data frame to a file. **Modify for each reserve**  
+## Quality Checks  
+
+```{r}
+dat_cdmo %>% 
+    select(Reserve:Species, QAQC) %>%
+    janitor::get_dupes() %>% 
+    View()
+```
+
+```{r}
+dat_cdmo %>% 
+    select(Reserve, SiteID, TransectID, PlotID,
+           Distance) %>% 
+    distinct() %>% 
+    janitor::get_dupes(-Distance)
+```
+
+
+## Correct discrepancies  
+
+
+## Write the CDMO data frame to a file. **Modify for each reserve**  
 
 ```{r}
 write_xlsx(dat_cdmo, path = here::here(path_out, "Reserve_CDMO.xlsx"),
@@ -165,12 +204,41 @@ write_xlsx(dat_cdmo, path = here::here(path_out, "Reserve_CDMO.xlsx"),
 ```
 
 
-### Output prep  
+# NaMaSTe tables  
+
+Get rid of any NAs in lat/long; we want station characteristics.  
 
 ```{r}
-all_coords <- tibble(Reserve = character(),
-                     SiteID = character(),
-                     Lat = numeric(),
-                     Long = numeric())
+station_table <- dat_cdmo %>% 
+    select(Reserve,
+           SiteID,
+           TransectID,
+           PlotID,
+           Lat,
+           Long,
+           Type,
+           "SSAM-1") %>% 
+    filter(!is.na(Lat),
+           !is.na(Long)) %>% 
+    distinct()
 ```
 
+Do any plots have multiple rows?  
+
+```{r}
+station_table %>% 
+    group_by(Reserve, SiteID, TransectID, PlotID) %>% 
+    tally() %>% 
+    arrange(desc(n)) %>% 
+    knitr::kable()
+```
+
+Are all stations actually represented? If the below output is FALSE, there's a problem to fix. If TRUE, proceed.     
+
+```{r}
+stns_all <- dat_cdmo %>% 
+    select(Reserve, SiteID, TransectID, PlotID) %>% 
+    distinct()
+
+nrow(stns_all) == nrow(station_table)
+```
