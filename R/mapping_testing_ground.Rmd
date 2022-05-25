@@ -1,7 +1,7 @@
 ---
 title: "Coordinate Mapping"
 author: "Kim Cressman"
-date: "4/28/2022"
+date: "2022-04-28; latest update `r Sys.Date()`"
 output: 
     html_document:
         toc: true
@@ -181,6 +181,61 @@ Somethings weird with these coordinates; they're not making transects when all c
 file_in <- here::here(path_start, "MAR", "Vegetation and Metadata",
                       "MARVEG2020_marsh_04.22.2021.xlsx")
 mar <- read_cdmo(file_in)
+```
+
+```{r}
+mar_plots <- mar %>% 
+    select(SiteID, TransectID, PlotID) %>% 
+    distinct()
+```
+
+MAR appears to have 325 distinct plots.  # transects per site:  
+
+```{r}
+mar_plots %>% 
+    group_by(SiteID) %>% 
+    summarize(n_transects = length(unique(TransectID))) %>% 
+    knitr::kable()
+```
+
+5 sites with 5 transects each = 25 transects total.  
+
+Number plots per transect:  
+
+```{r}
+mar_plots %>% 
+    group_by(SiteID, TransectID) %>% 
+    summarize(n_plots = length(unique(PlotID))) %>% 
+    knitr::kable()
+```
+
+Most sites have 11 plots per transect; at HF2 there are 21 plots per transect.  
+
+
+```{r}
+mar %>% 
+    select(SiteID, TransectID, PlotID, Date) %>% 
+    group_by(SiteID, TransectID, PlotID) %>% 
+    summarize(n_readings = length(unique(Date))) %>% 
+    arrange(n_readings) %>% 
+    knitr::kable()
+```
+
+```{r}
+# leaflet(all_coords) %>% 
+#     addProviderTiles(providers$Esri.WorldImagery) %>% 
+#     addCircleMarkers(lat = ~Lat, lng = ~Long,
+#                      weight = 2,
+#                      radius = 2,
+#                color = "orange",
+#                popup = ~paste(Reserve, SiteID, TransectID, PlotID,
+#                               sep = "-")) %>% 
+#     addScaleBar()
+```
+
+Based on the interview with the reserve, all appears to be correct. The transects are 20m long and 2m apart, so plots are close together and with bigger points on the map, they couldn't be delineated. With smaller points, the transects become apparent.  
+
+```{r}
 bind_coords(mar)
 ```
 
@@ -548,6 +603,8 @@ all_coords %>%
 leaflet(all_coords) %>% 
     addProviderTiles(providers$Esri.WorldImagery) %>% 
     addCircles(lat = ~Lat, lng = ~Long,
+               weight = 2,
+               radius = 2,
                color = "orange",
                popup = ~paste(Reserve, SiteID, TransectID, PlotID,
                               sep = "-")) %>% 
