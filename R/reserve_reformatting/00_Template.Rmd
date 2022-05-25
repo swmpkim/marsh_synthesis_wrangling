@@ -21,6 +21,7 @@ knitr::opts_chunk$set(echo = TRUE,
 ```{r}
 library(tidyverse)
 library(readxl)
+library(writexl)
 library(leaflet)
 library(rgdal)
 library(stringi)  # for stri_sub_replace()
@@ -40,8 +41,11 @@ source(here::here("R", "sourced", "00_helper_functions.R"))
 
 Update for each reserve: all start at  `here::here("submitted_data", "data")` but it varies by reserve.   
 
+Also create an output folder for each reserve in the `wrangled data` folder and update the `path_out` below.  
+
 ```{r}
 path_start <- here::here("submitted_data", "data")
+path_out <- here::here("wrangled_data")
 ```
 
 
@@ -59,7 +63,9 @@ to_read <- dir(path_start)[]
 
 Read into a list and combine  **MODIFY FOR DIFFERENT DATA TYPES**  
 
-CDMO format:  
+# CDMO formatted files to start  
+
+This section will compile code to read in and combine files that are already in CDMO format. Then a long CDMO-format file will be generated, after reconciling column names, dates, and putting things in order. The NaMaSTe template file will be generated from the CDMO-format file.  
 
 ```{r}
 dat_in <- list()
@@ -80,42 +86,83 @@ Check for columns that may have been named differently in different files.
 names(dat_all)
 ```
 
+If there are any necessary changes, make them here. Also pull out columns for Month, Day, and Year; and format Date as mm/dd/yyyy for the CDMO output file.  
+
+```{r}
+dat_all <- dat_all %>% 
+    mutate(
+        Year = lubridate::year(Date),
+        Month = lubridate::month(Date),
+        Day = lubridate::mday(Date),
+        Date = format(Date, "%m/%d/%Y")
+    ) 
+```
+
+```{r}
+names(dat_all)
+```
+
+
+## Mangroves or SAV?  
 
 Mangrove species are: *Avicennia germinans*, *Laguncularia racemosa*, *Rhizophora mangle*. Check for these before discarding a `Height` or `Diameter` column.   
+
+The following sums will be 0 if none of the genus names were found in the species column. This is only set to detect the first few letteres in case of misspellings, so if any sums are above 0, it deserves further investigation.  
+
+```{r}
+spp_all <- sort(unique(dat_all$Species))
+knitr::kable(spp_all)
+sum(str_detect("Avic", spp_all))
+sum(str_detect("Lagunc", spp_all))
+sum(str_detect("Rhizo", spp_all))
+
+```
+
+Also check for anything other than 'E' in 'Type'.
+
+```{r}
+unique(dat_all$Type)
+```
 
 
 ## CDMO format (long)  
 
-CDMO column names, in order  
+CDMO column names, in order. If columns had different names, or there were additional ones, account for that here.    
 
 ```{r}
-cdmo_names <- c(
-    "Reserve",
-    "Type",
-    "Date",
-    "SiteID",
-    "TransectID",
-    "PlotID",
-    "Subplot",
-    "Rep",
-    "SSAM-1",
-    "Lat",
-    "Long",
-    "Distance",
-    "Orthometric Height",
-    "Height Relative to MLLW",
-    "Species",
-    "Cover",
-    "Density",
-    "Maximum Canopy Height",
-    "Average Canopy Height",
-    "Diameter",
-    "Height",
-    "QAQC"
-)
+dat_cdmo <- dat_all %>% 
+    select(
+        "Reserve",
+        "Type",
+        "Date",
+        "SiteID",
+        "TransectID",
+        "PlotID",
+        "Subplot",
+        "Rep",
+        "SSAM-1",
+        "Lat",
+        "Long",
+        "Distance",
+        "Orthometric Height",
+        "Height Relative to MLLW",
+        "Species",
+        "Cover",
+        "Density",
+        "Maximum Canopy Height",
+        "Average Canopy Height",
+        "Diameter",
+        "Height",
+        "QAQC"
+    )
 ```
 
+Write the CDMO data frame to a file. **Modify for each reserve**  
 
+```{r}
+write_xlsx(dat_cdmo, path = here::here(path_out, "Reserve_CDMO.xlsx"),
+           format_headers = TRUE)
+```
 
 
 ### Output prep  

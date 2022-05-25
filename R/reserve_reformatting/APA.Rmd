@@ -73,6 +73,10 @@ for(i in seq_along(to_read)){
 dat_all <- bind_rows(dat_in)
 ```
 
+
+
+## Column wrangling  
+
 Deal with columns that were named different things in different files; also deal with date formats.  
 
 ```{r}
@@ -104,7 +108,9 @@ dat_all <- dat_all %>%
 names(dat_all)
 ```
 
-Mangrove species are: *Avicennia germinans*, *Laguncularia racemosa*, *Rhizophora mangle*. Check for these before discarding a Height column.   
+## Mangroves or SAV?  
+
+Mangrove species are: *Avicennia germinans*, *Laguncularia racemosa*, *Rhizophora mangle*. Check for these before discarding a `Height` or `Diameter` column.   
 
 The following sums will be 0 if none of the genus names were found in the species column. This is only set to detect the first few letteres in case of misspellings, so if any sums are above 0, it deserves further investigation.  
 
@@ -163,7 +169,6 @@ dat_cdmo <- dat_all %>%
 Write the CDMO data frame to a file.  
 
 ```{r}
-
 write_xlsx(dat_cdmo, path = here::here(path_out, "APA_CDMO.xlsx"),
            format_headers = TRUE)
 ```
