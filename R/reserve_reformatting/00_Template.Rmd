@@ -1,0 +1,94 @@
+---
+title: "Individual Reserve Template"
+author: "Kim Cressman"
+date: "2022-05-25; latest update `r Sys.Date()`"
+output: 
+    html_document:
+        toc: true
+        toc_depth: 2
+        code_folding: hide
+---
+
+Use this template to set up the wrangling for an individual reserve's files.  
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      warning = FALSE,
+                      message = FALSE)
+```
+
+```{r}
+library(tidyverse)
+library(readxl)
+library(leaflet)
+library(rgdal)
+library(stringi)  # for stri_sub_replace()
+```
+
+# Setup  
+
+## Helpful functions  
+
+Because I'll be doing this repetitively on similar data files....  
+
+```{r}
+source(here::here("R", "sourced", "00_helper_functions.R"))
+```
+
+## Data path  
+
+Update for each reserve: all start at  `here::here("submitted_data", "data")` but it varies by reserve.   
+
+```{r}
+path_start <- here::here("submitted_data", "data")
+```
+
+
+What are the files?  
+
+```{r}
+dir(path_start)  
+```
+
+Which ones to read in?  **MODIFY FOR EACH RESERVE**  
+
+```{r}
+to_read <- dir(path_start)[]
+```
+
+Read into a list and combine  **MODIFY FOR DIFFERENT DATA TYPES**  
+
+CDMO format:  
+
+```{r}
+dat_in <- list()
+
+for(i in seq_along(to_read)){
+    dat_in[[i]] <- read_cdmo2(here::here(path_start, to_read[i])) 
+}
+
+dat_all <- bind_rows(dat_in)
+```
+
+
+## Column wrangling  
+
+Check for columns that may have been named differently in different files.  
+
+```{r}
+names(dat_all)
+```
+
+
+Mangrove species are: *Avicennia germinans*, *Laguncularia racemosa*, *Rhizophora mangle*. Check for these before discarding a `Height` or `Diameter` column.   
+
+### Output prep  
+
+```{r}
+all_coords <- tibble(Reserve = character(),
+                     SiteID = character(),
+                     Lat = numeric(),
+                     Long = numeric())
+```
+
