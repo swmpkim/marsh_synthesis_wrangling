@@ -83,6 +83,41 @@ names(dat_all)
 
 Mangrove species are: *Avicennia germinans*, *Laguncularia racemosa*, *Rhizophora mangle*. Check for these before discarding a `Height` or `Diameter` column.   
 
+
+## CDMO format (long)  
+
+CDMO column names, in order  
+
+```{r}
+cdmo_names <- c(
+    "Reserve",
+    "Type",
+    "Date",
+    "SiteID",
+    "TransectID",
+    "PlotID",
+    "Subplot",
+    "Rep",
+    "SSAM-1",
+    "Lat",
+    "Long",
+    "Distance",
+    "Orthometric Height",
+    "Height Relative to MLLW",
+    "Species",
+    "Cover",
+    "Density",
+    "Maximum Canopy Height",
+    "Average Canopy Height",
+    "Diameter",
+    "Height",
+    "QAQC"
+)
+```
+
+
+
+
 ### Output prep  
 
 ```{r}

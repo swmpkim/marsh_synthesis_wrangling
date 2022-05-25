@@ -21,6 +21,7 @@ knitr::opts_chunk$set(echo = TRUE,
 ```{r}
 library(tidyverse)
 library(readxl)
+library(writexl)
 library(leaflet)
 library(rgdal)
 library(stringi)  # for stri_sub_replace()
@@ -42,6 +43,7 @@ Update for each reserve: all start at  `here::here("submitted_data", "data")` bu
 
 ```{r}
 path_start <- here::here("submitted_data", "data", "APA", "Data")
+path_out <- here::here("wrangled_data", "APA")
 ```
 
 
@@ -71,7 +73,7 @@ for(i in seq_along(to_read)){
 dat_all <- bind_rows(dat_in)
 ```
 
-Deal with columns that were named different things in different files.  
+Deal with columns that were named different things in different files; also deal with date formats.  
 
 ```{r}
 names(dat_all)
@@ -82,8 +84,6 @@ names(dat_all)
 +  `Percent Cover` is a column name in 2018 only. Corresponds to `Cover` in other years.  
 +  `Orthometric Height`, `Height`, and `Height Relative to MLLW` exist as columns and are all empty. `Height` is used specifically for mangroves, and the other two are retained (with underscores) in the Namaste template.  
 
-Mangrove species are: *Avicennia germinans*, *Laguncularia racemosa*, *Rhizophora mangle*. Check for these before discarding a Height column.   
-
 ```{r}
 dat_all <- dat_all %>% 
     mutate(`Average Canopy Height` = case_when(
@@ -91,18 +91,82 @@ dat_all <- dat_all %>%
         TRUE ~ `Average Canopy Height`
     ),
     Cover = case_when(!is.na(`Percent Cover`) ~ `Percent Cover`,
-                      TRUE ~ Cover)
+                      TRUE ~ Cover),
+    Year = lubridate::year(Date),
+    Month = lubridate::month(Date),
+    Day = lubridate::mday(Date),
+    Date = format(Date, "%m/%d/%Y")
     ) %>% 
     select(-`Averave Canopy Height`, -`Percent Cover`)
 ```
-
 
 ```{r}
 names(dat_all)
 ```
 
+Mangrove species are: *Avicennia germinans*, *Laguncularia racemosa*, *Rhizophora mangle*. Check for these before discarding a Height column.   
+
+The following sums will be 0 if none of the genus names were found in the species column. This is only set to detect the first few letteres in case of misspellings, so if any sums are above 0, it deserves further investigation.  
+
+```{r}
+spp_all <- sort(unique(dat_all$Species))
+knitr::kable(spp_all)
+sum(str_detect("Avic", spp_all))
+sum(str_detect("Lagunc", spp_all))
+sum(str_detect("Rhizo", spp_all))
+
+```
+
+Also check for anything other than 'E' in 'Type'.
+
+```{r}
+unique(dat_all$Type)
+```
+
+
 
 ### Output prep  
+
+## CDMO format (long)  
+
+Select and put column names in CDMO order  
+
+```{r}
+dat_cdmo <- dat_all %>% 
+    select(
+        "Reserve",
+        "Type",
+        "Date",
+        "SiteID",
+        "TransectID",
+        "PlotID",
+        "Subplot",
+        "Rep",
+        "SSAM-1" = SentinelSite,
+        "Lat",
+        "Long",
+        "Distance",
+        "Orthometric Height",
+        "Height Relative to MLLW",
+        "Species",
+        "Cover",
+        "Density",
+        "Maximum Canopy Height",
+        "Average Canopy Height",
+        "Diameter",
+        "Height",
+        "QAQC",
+        "Notes" = Extra_1
+    )
+```
+
+Write the CDMO data frame to a file.  
+
+```{r}
+
+write_xlsx(dat_cdmo, path = here::here(path_out, "APA_CDMO.xlsx"),
+           format_headers = TRUE)
+```
 
 ```{r}
 all_coords <- tibble(Reserve = character(),
