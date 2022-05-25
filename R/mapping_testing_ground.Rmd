@@ -85,7 +85,7 @@ bind_coords(cbm_jb)
 
 ### CBV  
 
-had to add "Other" as a column name in the file because there was text lower down in the column and this caused problems later.    
+originally had to add "Other" as a column name in the file because there was text lower down in the column and this caused problems later. On 5/25 I updated the read_cdmo function to accomodate and it seems to work fine now.      
 
 ```{r}
 file_in <- here::here(path_start, "CBV", "CBNERRVA VEG Data GI Reserve for Chris Peter.xlsx")
@@ -249,7 +249,7 @@ bind_coords(elk)
 
 ### KAC  
 
-had to add a 0 in the top QAQC column because otherwise it didn't get read in and caused problems.  
+originally had to add a 0 in the top QAQC column because otherwise it didn't get read in and caused problems. updated `read_cdmo` function on 5/25/2022 and problem is now fixed.  
 
 ```{r}
 file_in <- here::here(path_start, "KAC", "Recent data",

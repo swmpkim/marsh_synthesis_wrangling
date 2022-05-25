@@ -15,7 +15,7 @@ check_num2 <- function(x){
 }
 
 # read in the file, figure out how much to skip, read it in again, and rename the columns from the first test file
-read_cdmo <- function(file,
+read_cdmo_keepNAs <- function(file,
                       worksheet = NULL,
                       skip = NULL){
     # worksheet option if different worksheets of interest are in the file
@@ -44,11 +44,14 @@ read_cdmo <- function(file,
 }
 
 # same as above but turning all typed NAs into blank cells 
-read_cdmo2 <- function(file,
+read_cdmo <- function(file,
                       worksheet = NULL,
                       skip = NULL){
     # worksheet option if different worksheets of interest are in the file
     # skip option for reserves where the number to skip is known and the way to automate a guess *isn't* known  
+    
+    # headers are always top row; unknown number of explanatory rows below that
+    
     to_mod <- read_xlsx(file,
                         n_max = 10,
                         na = c("", "NA"),
@@ -62,12 +65,51 @@ read_cdmo2 <- function(file,
         skip <- skip_fun(lat_vec)  
     }
     
+    # read in sheet, skipping header and explanatory rows
+    # this strips the column names
     dat <- read_xlsx(file,
                      sheet = worksheet,
                      skip = skip,
                      na = c("", "NA"),
-                     col_names = FALSE) 
-    names(dat) <- names(to_mod)
+                     col_names = FALSE)
+    
+    # reassign names, from original sheet
+    if(ncol(dat) == ncol(to_mod)){
+        names(dat) <- names(to_mod)
+    }
+    
+    
+    # sometimes people have comments in additional columns
+    if(ncol(dat) > ncol(to_mod)){
+        # how many extra columns are there?
+        extra_cols <- ncol(dat) - ncol(to_mod)
+        
+        # create extra names
+        extra_names <- paste("Extra", seq(1:extra_cols), sep = "_")
+        
+        # use all the names
+        names(dat) <- c(names(to_mod), extra_names)
+    }
+    
+    
+    # other times the last column or few columns are empty so don't get read in when headers are skipped
+    if(ncol(dat) < ncol(to_mod)){
+        # how many empty columns do we need?
+        new_cols <- ncol(to_mod) - ncol(dat)
+        
+        # make dummy names
+        new_names <- paste("Empty", seq(1:new_cols), sep = "_")
+        
+        # create them in 'dat'
+        for(j in seq_along(new_names)){
+            dat[[new_names[j]]] <- NA
+        }
+        
+        # now combine names
+        names(dat) <- names(to_mod)
+    }
+    
+    
     dat <- dat %>% 
         mutate(SiteID = as.character(SiteID))
     return(dat)
