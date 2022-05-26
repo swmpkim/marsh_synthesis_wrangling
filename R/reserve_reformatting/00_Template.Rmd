@@ -45,7 +45,12 @@ Also create an output folder for each reserve in the `wrangled data` folder and 
 
 ```{r}
 path_start <- here::here("submitted_data", "data")
-path_out <- here::here("wrangled_data")
+path_out <- here::here("wrangled_data", "GND")
+
+# create the output folder if it doesn't already exist
+if(!dir.exists(path_out)){
+    dir.create(path_out)
+}
 ```
 
 
