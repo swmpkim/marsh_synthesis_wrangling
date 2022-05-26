@@ -191,28 +191,28 @@ dat_cdmo <- dat_all %>%
 ## Quality Checks  
 
 ```{r}
-dat_cdmo %>% 
-    select(Reserve:Species, QAQC) %>%
-    janitor::get_dupes() %>% 
-    View()
+# dat_cdmo %>% 
+#     select(Reserve:Species, QAQC) %>%
+#     janitor::get_dupes() %>% 
+#     View()
+# 
+# # suspect the 2nd instance of this should have been PlotID = 7 and this was a typo  
+# dat_cdmo %>% 
+#     filter(SiteID == "PC",
+#            TransectID == 3,
+#            PlotID == 5,
+#            Species == "Symphyotrichum tenuifolium") %>% 
+#     View()
+# 
 
-# suspect the 2nd instance of this should have been PlotID = 7 and this was a typo  
-dat_cdmo %>% 
-    filter(SiteID == "PC",
-           TransectID == 3,
-           PlotID == 5,
-           Species == "Symphyotrichum tenuifolium") %>% 
-    View()
-
-
-# actual different values entered for this one: cover is 0.1 vs 20;
-# average canopy height NA vs. 1.65 
-dat_cdmo %>% 
-    filter(SiteID == "LSM",
-           TransectID == 1,
-           PlotID == 4,
-           Species == "Spartina cynosuroides") %>% 
-    View()
+# # actual different values entered for this one: cover is 0.1 vs 20;
+# # average canopy height NA vs. 1.65 
+# dat_cdmo %>% 
+#     filter(SiteID == "LSM",
+#            TransectID == 1,
+#            PlotID == 4,
+#            Species == "Spartina cynosuroides") %>% 
+#     View()
 ```
 
 ```{r}
@@ -237,12 +237,12 @@ dat_cdmo %>%
            Distance) %>% 
     tally()
 
-# only shows up once; okay will change that to 80
-# where is it though
-dat_cdmo %>% 
-    filter(SiteID == "PC", TransectID == 2,
-           PlotID == 5, Distance == 60) %>% 
-    View()
+# # only shows up once; okay will change that to 80
+# # where is it though
+# dat_cdmo %>% 
+#     filter(SiteID == "PC", TransectID == 2,
+#            PlotID == 5, Distance == 60) %>% 
+#     View()
 
 # 4/23/2018, Juncus roemerianus
 ```
@@ -263,12 +263,6 @@ dat_cdmo$Long[422] <- -85.02567
 ```
 
 
-2.  10/03/2016, LSM, Transect 1, Plot 4 has two rows for Spartina cynosuroides. I don’t think this is a plot typo, but cover and density are different between the two rows – so maybe a species typo? It’s rows 907 and 908 in the [uncorrected] APA_CDMO spreadsheet: rows 906 and 907 in the data frame.   
-
-```{r}
-
-```
-
 
 3.  Distance of 60 at PC-2-5 on 4/23/2018. Row 1617 in data frame.    
 
@@ -276,6 +270,52 @@ dat_cdmo$Long[422] <- -85.02567
 dat_cdmo$Distance[1617] <- 80
 ```
 
+
+2.  2nd issue to come up but moved below the others because I'm going to remove a row.  
+
+10/03/2016, LSM, Transect 1, Plot 4 has two rows for Spartina cynosuroides. I don’t think this is a plot typo, but cover and density are different between the two rows – so maybe a species typo? It’s rows 907 and 908 in the [uncorrected] APA_CDMO spreadsheet: rows 906 and 907 in the data frame.   
+
+--per emails with the reserve, veg monitoring is conducted by contractors and the reserve recommends flagging these as suspect. (5/26/22)  
+
+--unfortunately to pivot, I need to only have one row with all these identifiers and species. Because row 906 (the first entry) only shows cover of 0.1 and no density, heights, or other data; and removing row 907 which has cover of 20% would greatly change the total percent cover for the plot; I believe I'll flag row 907 as suspect, add a note into the 'notes' column, and then remove row 906.  
+
+```{r}
+dat_cdmo$QAQC[907] <- "<1>"
+dat_cdmo$Notes[907] <- "Originally two rows for this Spartina cynosuroides in this plot on this date. First row recorded 0.1 for cover and no other information; that row was removed and the row containing 20 for cover and 1.65 for canopy height was retained."
+dat_cdmo <- dat_cdmo[-906, ]
+```
+
+
+
+4. More dupes when attempting to pivot:  
+
+```{r}
+more_dupen <- dat_cdmo %>% 
+    select(Reserve:Cover) %>% 
+    pivot_wider(names_from = Species,
+                values_from = Cover,
+                values_fn = length)
+
+summary(more_dupen)
+
+# seems to be unvegetated
+
+more_dupen %>% 
+    filter(Unvegetated == 2) %>% 
+    View()
+
+more_dupen %>% 
+    filter(Unvegetated == 2) %>% 
+    select(Reserve:Distance) %>% 
+    left_join(dat_cdmo) %>% 
+    select(Date:PlotID, Species, Cover) %>% 
+    filter(Species == "Unvegetated") %>% 
+    View()
+```
+
+4 instances where 'Unvegetated' was entered twice for a plot on a date. With the double entries, total cover adds up to ~100%, so rather than removing information, will add cover for both rows together, insert <1> QAQC flag, and detail in 'Notes'. These instances are:  10/04/2016 PC-2-7;   04/18/2017 PC-2-2;   04/18/2017 PC 2-7;   04/23/2018 PC 3-1.
+
+# FIX BEFORE PROCEEDING  
 
 
 ## Write the CDMO data frame to a file.  
@@ -318,18 +358,18 @@ station_table %>%
     arrange(desc(n)) %>% 
     knitr::kable()
 
-# PC-3-7 had multiple  
-station_table %>% 
-    group_by(Reserve, SiteID, TransectID, PlotID) %>% 
-    filter(SiteID == "PC", TransectID == 3, PlotID == 7) %>% 
-    View()
-
-dat_cdmo %>% 
-    select(Reserve, SiteID, TransectID, PlotID, Lat, Long) %>% 
-    filter(SiteID == "PC", TransectID == 3, PlotID == 7) %>% 
-    group_by(Reserve, SiteID, TransectID, PlotID, Lat, Long) %>% 
-    tally() %>% 
-    View()
+# # PC-3-7 had multiple  
+# station_table %>% 
+#     group_by(Reserve, SiteID, TransectID, PlotID) %>% 
+#     filter(SiteID == "PC", TransectID == 3, PlotID == 7) %>% 
+#     View()
+# 
+# dat_cdmo %>% 
+#     select(Reserve, SiteID, TransectID, PlotID, Lat, Long) %>% 
+#     filter(SiteID == "PC", TransectID == 3, PlotID == 7) %>% 
+#     group_by(Reserve, SiteID, TransectID, PlotID, Lat, Long) %>% 
+#     tally() %>% 
+#     View()
 ```
 
 Uncorrected version (has been updated):  
@@ -345,10 +385,10 @@ And 85 of these: 29.59603
 I suspect a typo.  
 
 ```{r}
-dat_cdmo %>% 
-    select(Reserve, SiteID, TransectID, PlotID, Date, Lat, Long) %>% 
-    filter(Lat == 29.59617) %>% 
-    View()
+# dat_cdmo %>% 
+#     select(Reserve, SiteID, TransectID, PlotID, Date, Lat, Long) %>% 
+#     filter(Lat == 29.59617) %>% 
+#     View()
 ```
 
 Yes, those are coordinates for Plot 5. And it's 4/7/2015, when the plotID typo existed. Need to change those coordinates too then. (Note: updated above.)   
@@ -374,7 +414,8 @@ nrow(stns_all) == nrow(station_table)
 cvr <- dat_cdmo %>% 
     select(Reserve:Cover) %>% 
     pivot_wider(names_from = Species,
-                values_from = Cover)
+                values_from = Cover,
+                values_fn = length)
 
 cvr_qaqc <- dat_cdmo %>% 
     select(Reserve:Species, QAQC) %>%
