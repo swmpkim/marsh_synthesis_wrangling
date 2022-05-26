@@ -1,5 +1,5 @@
 ---
-title: "Individual Reserve Template"
+title: "NIW"
 author: "Kim Cressman"
 date: "2022-05-25; latest update `r Sys.Date()`"
 output: 
@@ -8,8 +8,6 @@ output:
         toc_depth: 2
         code_folding: hide
 ---
-
-Use this template to set up the wrangling for an individual reserve's files.  
 
 
 ```{r setup, include=FALSE}
@@ -44,8 +42,8 @@ Update for each reserve: all start at  `here::here("submitted_data", "data")` bu
 Also create an output folder for each reserve in the `wrangled data` folder and update the `path_out` below.  
 
 ```{r}
-path_start <- here::here("submitted_data", "data")
-path_out <- here::here("wrangled_data")
+path_start <- here::here("submitted_data", "data", "NIW")
+path_out <- here::here("wrangled_data", "NIW")
 ```
 
 
@@ -58,7 +56,12 @@ dir(path_start)
 Which ones to read in?  **MODIFY FOR EACH RESERVE**  
 
 ```{r}
-to_read <- dir(path_start)[]
+step1 <- str_starts(dir(path_start), "NIWVEG")
+step2 <- str_detect(dir(path_start), ".xlsx")
+step3 <- step1 + step2
+
+
+to_read <- dir(path_start)[which(step3 == 2)]
 ```
 
 Read into a list and combine  **MODIFY FOR DIFFERENT DATA TYPES**  
@@ -71,12 +74,11 @@ This section will compile code to read in and combine files that are already in 
 dat_in <- list()
 
 for(i in seq_along(to_read)){
-    dat_in[[i]] <- read_cdmo2(here::here(path_start, to_read[i])) 
+    dat_in[[i]] <- read_cdmo(here::here(path_start, to_read[i])) 
 }
 
 dat_all <- bind_rows(dat_in)
 ```
-
 
 
 # Checks  
@@ -150,6 +152,8 @@ unique(dat_all$Type)
 ```
 
 
+
+
 ## Column wrangling  
 
 Check for columns that may have been named differently in different files.  
@@ -173,6 +177,27 @@ dat_all <- dat_all %>%
 ```{r}
 names(dat_all)
 ```
+
+# FIX KNOWN ISSUES  
+
+In the 2020 file, 'Lat' is repeated in the 'Long' column for Segment B, Plot 3-3. 
+
+Per email with Tracy on 5/16/22, coordinates for this plot are:  
+33.34045339	-79.2030272  
+
+Code used to fix it in the mapping script was:  
+
+```{r}
+# file_in <- here::here(path_start, "NIW", "NIWVEG2020.xlsx")
+# niw <- read_cdmo(file_in) %>% 
+#     mutate(id = paste(SiteID, TransectID, PlotID, sep = "-"),
+#            Lat = case_when(id == "Segment B-3-3" ~ 33.34045339,
+#                            TRUE ~ Lat),
+#            Long = case_when(id == "Segment B-3-3" ~ -79.2030272,
+#                             TRUE ~ Long))
+```
+
+
 
 
 
