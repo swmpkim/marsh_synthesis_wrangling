@@ -1,5 +1,5 @@
 ---
-title: "APA - data that has been through CDMO QAQC"
+title: "Individual Reserve Template"
 author: "Kim Cressman"
 date: "2022-05-25; latest update `r Sys.Date()`"
 output: 
@@ -10,6 +10,13 @@ output:
 ---
 
 Use this template to set up the wrangling for an individual reserve's files.  
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      warning = FALSE,
+                      message = FALSE)
+```
 
 ```{r}
 library(tidyverse)
@@ -34,18 +41,12 @@ source(here::here("R", "sourced", "00_helper_functions.R"))
 
 Update for each reserve: all start at  `here::here("submitted_data", "data")` but it varies by reserve.   
 
-Also create an output folder for each reserve in the `wrangled data` folder and update the `path_out` below.  
-
 ```{r}
-path_start <- here::here("submitted_data", "data", "APA")
+path_start <- here::here("submitted_data", "data", "APA", "Data")
 path_out <- here::here("wrangled_data", "APA")
-
-# create the output folder if it doesn't already exist
-if(!dir.exists(path_out)){
-    dir.create(path_out)
-}
 ```
 
+## Read and combine data  
 
 What are the files?  
 
@@ -56,14 +57,12 @@ dir(path_start)
 Which ones to read in?  **MODIFY FOR EACH RESERVE**  
 
 ```{r}
-to_read <- dir(path_start)[c(3, 5, 7, 9, 11, 13, 15)]
+to_read <- dir(path_start)[c(1:6, 8)]
 ```
 
 Read into a list and combine  **MODIFY FOR DIFFERENT DATA TYPES**  
 
-# CDMO formatted input  
-
-This section will compile code to read in and combine files that are already in CDMO format. Then a long CDMO-format file will be generated, after reconciling column names, dates, and putting things in order. The NaMaSTe template file will be generated from the CDMO-format file.  
+CDMO format:  
 
 ```{r}
 dat_in <- list()
@@ -75,50 +74,7 @@ for(i in seq_along(to_read)){
 dat_all <- bind_rows(dat_in)
 ```
 
-
-
-# Checks  
-
-## Column names and types?  
-
-Look for different column names for the same thing.  
-
-```{r}
-names(dat_all)
-```
-
-Still have:  
-
-+  Averave Canopy Height - transfer to Average Canopy Height  
-+  Percent Cover; transfer to Cover  
-+  Newly noticed: SentinelSite should be transferred to SSAM-1.  
-
-No extra columns with notes past the QAQC column.  
-
-**all fixed below**  
-
-
-## Duplicates in date-site-transect-plot-species  
-
-Include subplot if used by reserve. Want an empty tibble below.    
-
-```{r}
-# subplot included
-dat_all %>% 
-   group_by(Date, SiteID, TransectID, PlotID, Subplot, Species) %>% 
-    tally() %>% 
-    filter(n > 1) %>% 
-    select(Date:Species, n)
-
-# # no subplot included
-# dat_all %>% 
-#    group_by(Date, SiteID, TransectID, PlotID,  Species) %>% 
-#     tally() %>% 
-#     filter(n > 1) %>% 
-#     select(Date:Species, n)
-```
-
-Still have Spartina cynosuroides and Unvegetated dupes. No longer have mistaken plot ID.  
+# CDMO formatted input  
 
 ## Check station/plot names  
 
@@ -130,96 +86,50 @@ dat_all %>%
     knitr::kable()
 ```
 
-Still have 'Un' as a Reserve code somewhere.    
 
-### 'Distance' discrepancies  
-
-```{r}
-stn_dupes <- dat_all %>% 
-    select(Reserve, SiteID, TransectID, PlotID,
-           Distance) %>% 
-    distinct() %>% 
-    janitor::get_dupes(-Distance)
-
-stn_dupes
-```
-
-PC 2-5 has distances of 60 and 80.  
-PC 3-7 has distances of 60 and 40.  
+Fix any issues here.  
 
 ```{r}
-# Distances for Transect 2
-dat_all %>% 
-    select(SiteID, TransectID, PlotID,
-           Distance) %>% 
-    filter(SiteID == "PC", TransectID == 2) %>% 
-    group_by(SiteID, TransectID, PlotID,
-           Distance) %>% 
-    tally()
-
-# 60 only shows up once; should be 80
-
-
-# # where is it though
-# dat_all %>% 
-#     filter(SiteID == "PC", TransectID == 2,
-#            PlotID == 5, Distance == 60) %>% 
-#     View()
-
-# 4/23/2018, Juncus roemerianus
-
-
-
-# Distances for Transect 3
-dat_all %>% 
-    select(SiteID, TransectID, PlotID,
-           Distance) %>% 
-    filter(SiteID == "PC", TransectID == 3) %>% 
-    group_by(SiteID, TransectID, PlotID,
-           Distance) %>% 
-    tally()
-
-# 40 only shows up once; should be 60. I bet this is from when it was logged as plot 5 instead of plot 7.  
-
-# find it
-# dat_all %>%
-#     filter(SiteID == "PC", TransectID == 3,
-#            PlotID == 7, Distance == 40) %>%
-#     View()
-
-# 4/7/2015, Symphyotrichum tenuifolium
+dat_all <- dat_all %>% 
+    mutate(Reserve = case_when(Reserve != "APA" ~ "APA",
+                               TRUE ~ Reserve))
 ```
 
 
-### Lat/Long discrepancies  
+## Column wrangling  
+
+Deal with columns that were named different things in different files; also deal with date formats.  
 
 ```{r}
-stn_dupes2 <- dat_all %>% 
-    select(Reserve, SiteID, TransectID, PlotID,
-           Lat, Long) %>% 
-    distinct() %>% 
-    janitor::get_dupes(-Lat, -Long)
-
-stn_dupes2
-
-# find the incorrect ones
-dat_all %>% 
-    select(SiteID, TransectID, PlotID,
-           Lat, Long) %>% 
-    filter(SiteID == "PC", TransectID == 3, PlotID == 7) %>% 
-    group_by(SiteID, TransectID, PlotID,
-           Lat, Long) %>% 
-    tally()
+names(dat_all)
 ```
 
-One incorrect Lat/Long for PC-3-7, probably left over from when that plot was mistakenly entered as 5. Correct coords are:  
 
-29.59603
--85.02567
++  typo: `Averave Canopy Height` values will be transferred to `Average Canopy Height`.  
++  `Percent Cover` is a column name in 2018 only. Corresponds to `Cover` in other years.  
++  `Orthometric Height`, `Height`, and `Height Relative to MLLW` exist as columns and are all empty. `Height` is used specifically for mangroves, and the other two are retained (with underscores) in the Namaste template.  
 
+```{r}
+dat_all <- dat_all %>% 
+    mutate(`Average Canopy Height` = case_when(
+        !is.na(`Averave Canopy Height`) ~ `Averave Canopy Height`,
+        TRUE ~ `Average Canopy Height`
+    ),
+    Cover = case_when(!is.na(`Percent Cover`) ~ `Percent Cover`,
+                      TRUE ~ Cover),
+    Year = lubridate::year(Date),
+    Month = lubridate::month(Date),
+    Day = lubridate::mday(Date),
+    Date = format(Date, "%m/%d/%Y")
+    ) %>% 
+    select(-`Averave Canopy Height`, -`Percent Cover`)
+```
 
+```{r}
+names(dat_all)
+```
 
-## Mangroves or SAV present?  
+## Mangroves or SAV?  
 
 Mangrove species are: *Avicennia germinans*, *Laguncularia racemosa*, *Rhizophora mangle*. Check for these before discarding a `Height` or `Diameter` column.   
 
@@ -239,145 +149,6 @@ Also check for anything other than 'E' in 'Type'.
 ```{r}
 unique(dat_all$Type)
 ```
-
-
-# Fix discrepancies  
-
-```{r}
-dat_all <- dat_all %>% 
-    mutate(Reserve = case_when(Reserve != "APA" ~ "APA",
-                               TRUE ~ Reserve),
-           `Average Canopy Height` = case_when(
-               !is.na(`Averave Canopy Height`) ~ `Averave Canopy Height`,
-               TRUE ~ `Average Canopy Height`),
-           Cover = case_when(!is.na(`Percent Cover`) ~ `Percent Cover`,
-                             TRUE ~ Cover),
-           `SSAM-1` = case_when(!is.na(SentinelSite) ~ SentinelSite,
-                                TRUE ~ `SSAM-1`)
-           ) %>% 
-    select(-`Averave Canopy Height`, -`Percent Cover`, -SentinelSite)
-```
-
-
-
-
-
-
-# Format  
-
-## Column wrangling  
-
-
-If there are any necessary changes, make them here. Also pull out columns for Month, Day, and Year; and format Date as mm/dd/yyyy for the CDMO output file.  
-
-```{r}
-dat_all <- dat_all %>% 
-    mutate(
-        Year = lubridate::year(Date),
-        Month = lubridate::month(Date),
-        Day = lubridate::mday(Date),
-        Date = format(Date, "%m/%d/%Y")
-    ) 
-```
-
-```{r}
-names(dat_all)
-```
-
-
-
-
-## CDMO format (long)  
-
-CDMO column names, in order. If columns had different names, or there were additional ones, account for that here.    
-
-```{r}
-dat_cdmo <- dat_all %>% 
-    select(
-        "Reserve",
-        "Type",
-        "Date",
-        "SiteID",
-        "TransectID",
-        "PlotID",
-        "Subplot",
-        "Rep",
-        "SSAM-1",
-        "Lat",
-        "Long",
-        "Distance",
-        "Orthometric Height",
-        "Height Relative to MLLW",
-        "Species",
-        "Cover",
-        "Density",
-        "Maximum Canopy Height",
-        "Average Canopy Height",
-        "Diameter",
-        "Height",
-        "QAQC"
-    )
-```
-
-
-
-## Write the CDMO data frame to a file. **Modify for each reserve**  
-
-```{r}
-write_xlsx(dat_cdmo, path = here::here(path_out, "APA_CDMO.xlsx"),
-           format_headers = TRUE)
-```
-
-
-# NaMaSTe tables  
-
-Get rid of any NAs in lat/long; we want station characteristics.  
-
-```{r}
-station_table <- dat_cdmo %>% 
-    select(Reserve,
-           SiteID,
-           TransectID,
-           PlotID,
-           Lat,
-           Long,
-           Type,
-           "SSAM-1") %>% 
-    filter(!is.na(Lat),
-           !is.na(Long)) %>% 
-    distinct()
-```
-
-Do any plots have multiple rows?  
-
-```{r}
-station_table %>% 
-    group_by(Reserve, SiteID, TransectID, PlotID) %>% 
-    tally() %>% 
-    arrange(desc(n)) %>% 
-    knitr::kable()
-```
-
-Are all stations actually represented? If the below output is FALSE, there's a problem to fix. If TRUE, proceed.     
-
-```{r}
-stns_all <- dat_cdmo %>% 
-    select(Reserve, SiteID, TransectID, PlotID) %>% 
-    distinct()
-
-nrow(stns_all) == nrow(station_table)
-```
-
-
-
-
-
-
-
-
-
-# OLD     
-
 
 
 
@@ -417,8 +188,64 @@ dat_cdmo <- dat_all %>%
 ```
 
 
+## Quality Checks  
 
+```{r}
+# dat_cdmo %>% 
+#     select(Reserve:Species, QAQC) %>%
+#     janitor::get_dupes() %>% 
+#     View()
+# 
+# # suspect the 2nd instance of this should have been PlotID = 7 and this was a typo  
+# dat_cdmo %>% 
+#     filter(SiteID == "PC",
+#            TransectID == 3,
+#            PlotID == 5,
+#            Species == "Symphyotrichum tenuifolium") %>% 
+#     View()
+# 
 
+# # actual different values entered for this one: cover is 0.1 vs 20;
+# # average canopy height NA vs. 1.65 
+# dat_cdmo %>% 
+#     filter(SiteID == "LSM",
+#            TransectID == 1,
+#            PlotID == 4,
+#            Species == "Spartina cynosuroides") %>% 
+#     View()
+```
+
+```{r}
+stn_dupes <- dat_cdmo %>% 
+    select(Reserve, SiteID, TransectID, PlotID,
+           Distance) %>% 
+    distinct() %>% 
+    janitor::get_dupes(-Distance)
+
+dat_cdmo %>% 
+    select(Reserve, SiteID, TransectID, PlotID,
+           Distance) %>% 
+    distinct() %>% 
+    filter(SiteID == "PC", TransectID == 2)
+# Pretty sure the Distance of 60 is the typo. How often does it show up?  
+
+dat_cdmo %>% 
+    select(SiteID, TransectID, PlotID,
+           Distance) %>% 
+    filter(SiteID == "PC", TransectID == 2) %>% 
+    group_by(SiteID, TransectID, PlotID,
+           Distance) %>% 
+    tally()
+
+# # only shows up once; okay will change that to 80
+# # where is it though
+# dat_cdmo %>% 
+#     filter(SiteID == "PC", TransectID == 2,
+#            PlotID == 5, Distance == 60) %>% 
+#     View()
+
+# 4/23/2018, Juncus roemerianus
+```
 
 ## Correct discrepancies.  
 

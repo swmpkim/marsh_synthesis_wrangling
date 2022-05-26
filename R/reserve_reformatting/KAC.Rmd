@@ -1,5 +1,5 @@
 ---
-title: "Individual Reserve Template"
+title: "KAC"
 author: "Kim Cressman"
 date: "2022-05-25; latest update `r Sys.Date()`"
 output: 
@@ -44,8 +44,9 @@ Update for each reserve: all start at  `here::here("submitted_data", "data")` bu
 Also create an output folder for each reserve in the `wrangled data` folder and update the `path_out` below.  
 
 ```{r}
-path_start <- here::here("submitted_data", "data")
-path_out <- here::here("wrangled_data")
+path_start <- here::here("submitted_data", "data", "KAC", "Recent data")
+path2_start <- here::here("submitted_data", "data", "KAC", "Data from CDMO")
+path_out <- here::here("wrangled_data", "KAC")
 
 # create the output folder if it doesn't already exist
 if(!dir.exists(path_out)){
@@ -58,12 +59,23 @@ What are the files?
 
 ```{r}
 dir(path_start)  
+dir(path2_start)  # subfolders for each year, 2010-2013
 ```
+
+2016-2021 are in the 'Recent Data' folder. There are subfolders in 'Data from CDMO' for each of 2010, 2011, 2012, and 2013.  
+
 
 Which ones to read in?  **MODIFY FOR EACH RESERVE**  
 
 ```{r}
-to_read <- dir(path_start)[]
+to_read <- dir(path_start)[c(1, 3, 5, 7, 10)]
+
+in2010 <- here::here(path2_start, "KACVEG2010", "KACVEG2010.xlsx")
+in2011 <- here::here(path2_start, "KACVEG2011", "KACVEG2011.xlsx")
+in2012 <- here::here(path2_start, "KACVEG2012", "KACVEG2012.xlsx")
+in2013 <- here::here(path2_start, "KACVEG2013", "KACVEG2013.xlsx")
+
+to_read2 <- c(in2010, in2011, in2012, in2013)
 ```
 
 Read into a list and combine  **MODIFY FOR DIFFERENT DATA TYPES**  
@@ -72,6 +84,9 @@ Read into a list and combine  **MODIFY FOR DIFFERENT DATA TYPES**
 
 This section will compile code to read in and combine files that are already in CDMO format. Then a long CDMO-format file will be generated, after reconciling column names, dates, and putting things in order. The NaMaSTe template file will be generated from the CDMO-format file.  
 
+
+### 2016-2021:  
+
 ```{r}
 dat_in <- list()
 
@@ -79,7 +94,27 @@ for(i in seq_along(to_read)){
     dat_in[[i]] <- read_cdmo(here::here(path_start, to_read[i])) 
 }
 
-dat_all <- bind_rows(dat_in)
+dat_all1 <- bind_rows(dat_in)
+```
+
+
+### 2010-2013  
+
+```{r}
+dat_in2 <- list()
+
+for(i in seq_along(to_read2)){
+    dat_in2[[i]] <- read_cdmo(to_read2[i]) 
+}
+
+dat_all2 <- bind_rows(dat_in2)
+```
+
+
+## Join all together  
+
+```{r}
+dat_all <- bind_rows(dat_all1, dat_all2)
 ```
 
 
@@ -94,25 +129,56 @@ Look for different column names for the same thing.
 names(dat_all)
 ```
 
+To reconcile:  
+
++  Cover / % Cover  
++  Elevation / Orthometric Height   
+
+Several values in the `% Cover` Column are "R": per the metadata, this means "Trace", or <1%. For our purposes, am converting to 0.1.  
+
+```{r}
+dat_all2 <- dat_all %>% 
+    mutate(`% Cover` = case_when(`% Cover` == "R" ~ "0.1",
+                                 TRUE ~ `% Cover`),
+           `% Cover` = as.numeric(`% Cover`),
+           Cover = case_when(!is.na(`% Cover`) ~ `% Cover`,
+                             TRUE ~ Cover),
+           `Orthometric Height` = case_when(!is.na(Elevation) ~ (Elevation/100),
+                                     TRUE ~ `Orthometric Height`),
+           Date = format(Date, "%m/%d/%Y")
+           ) %>% 
+    select(-`% Cover`, -`Elevation`)
+```
+
+
+
 ## Duplicates in date-site-transect-plot-species  
 
 Include subplot if used by reserve. Want an empty tibble below.    
 
 ```{r}
-# subplot included
-dat_all %>% 
-   group_by(Date, SiteID, TransectID, PlotID, Subplot, Species) %>% 
-    tally() %>% 
-    filter(n > 1) %>% 
-    select(Date:Species, n)
-
-# # no subplot included
+# # subplot included
 # dat_all %>% 
-#    group_by(Date, SiteID, TransectID, PlotID,  Species) %>% 
+#    group_by(Date, SiteID, TransectID, PlotID, Subplot, Species) %>% 
 #     tally() %>% 
 #     filter(n > 1) %>% 
 #     select(Date:Species, n)
+# 
+# no subplot included
+dat_all %>%
+   group_by(Date, SiteID, TransectID, PlotID,  Species) %>%
+    tally() %>%
+    filter(n > 1) %>%
+    select(Date:Species, n)
 ```
+
+5 instances of duplicated "unvegetated":  
+
++  8/17/2010 FR-T3 FR23  
++  8/18/2010 FR-T4 FR28  
++  8/18 2010 FR-T5 FR54  
++  8/18/2010 FR-T6 FR57  
++  8/7/2013 BS-T14 BS47  
 
 
 ## Check station/plot names  
@@ -126,21 +192,11 @@ dat_all %>%
 ```
 
 
-### 'Distance' discrepancies  
+Fix any issues here.  
 
 ```{r}
-stn_dupes <- dat_all %>% 
-    select(Reserve, SiteID, TransectID, PlotID,
-           Distance) %>% 
-    distinct() %>% 
-    janitor::get_dupes(-Distance)
 
-stn_dupes
 ```
-
-
-### Lat/Long discrepancies  
-
 
 
 ## Mangroves or SAV present?  
@@ -165,13 +221,15 @@ unique(dat_all$Type)
 ```
 
 
-
-# Fix discrepancies  
-
-
 ## Column wrangling  
 
-Pull out columns for Month, Day, and Year; and format Date as mm/dd/yyyy for the CDMO output file.  
+
+
+```{r}
+names(dat_all)
+```
+
+If there are any necessary changes, make them here. Also pull out columns for Month, Day, and Year; and format Date as mm/dd/yyyy for the CDMO output file.  
 
 ```{r}
 dat_all <- dat_all %>% 
@@ -182,6 +240,11 @@ dat_all <- dat_all %>%
         Date = format(Date, "%m/%d/%Y")
     ) 
 ```
+
+```{r}
+names(dat_all)
+```
+
 
 
 
@@ -216,6 +279,26 @@ dat_cdmo <- dat_all %>%
         "QAQC"
     )
 ```
+
+## Quality Checks  
+
+```{r}
+dat_cdmo %>% 
+    select(Reserve:Species, QAQC) %>%
+    janitor::get_dupes() %>% 
+    View()
+```
+
+```{r}
+dat_cdmo %>% 
+    select(Reserve, SiteID, TransectID, PlotID,
+           Distance) %>% 
+    distinct() %>% 
+    janitor::get_dupes(-Distance)
+```
+
+
+## Correct discrepancies  
 
 
 ## Write the CDMO data frame to a file. **Modify for each reserve**  
