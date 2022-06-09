@@ -54,7 +54,7 @@ read_cdmo <- function(file,
     
     to_mod <- read_xlsx(file,
                         n_max = 10,
-                        na = c("", "NA"),
+                        na = c("", "NA", "N/A"),
                         sheet = worksheet)
     
     # which column has "Lat" in it? This should be numeric.
@@ -70,7 +70,7 @@ read_cdmo <- function(file,
     dat <- read_xlsx(file,
                      sheet = worksheet,
                      skip = skip,
-                     na = c("", "NA"),
+                     na = c("", "NA", "N/A"),
                      col_names = FALSE)
     
     # reassign names, from original sheet
