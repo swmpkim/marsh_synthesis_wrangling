@@ -56,7 +56,14 @@ dir(path_start)
 Which ones to read in?  **MODIFY FOR EACH RESERVE**  
 
 ```{r}
-to_read <- dir(path_start)[c(3, 5, 7, 9, 11, 13, 15)]
+files_all <- dir(path_start) 
+
+# figure out which ones match the pattern APAVEG[yyyy].xlsx
+# \\d for digit; {4} for 'exactly 4 times'; \\. for . only (otherwise it's a class)
+# stack overflow regex tutorial: https://stackoverflow.com/questions/4736/learning-regular-expressions
+files_matching <- str_which(files_all, "APAVEG\\d{4}\\.xlsx")
+
+to_read <- files_all[files_matching]
 ```
 
 Read into a list and combine  **MODIFY FOR DIFFERENT DATA TYPES**  
