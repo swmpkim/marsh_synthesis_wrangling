@@ -109,9 +109,11 @@ read_cdmo <- function(file,
         names(dat) <- names(to_mod)
     }
     
-    
-    dat <- dat %>% 
-        mutate(SiteID = as.character(SiteID))
+    if("SiteID" %in% names(dat)){
+        dat <- dat %>% 
+            mutate(SiteID = as.character(SiteID)) 
+    }
+
     return(dat)
 }
 
