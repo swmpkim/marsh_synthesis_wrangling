@@ -14,6 +14,12 @@ check_num2 <- function(x){
     which(is.na(y))
 }
 
+# figure out which items in a vector *can* be converted to numeric
+check_num3 <- function(x){
+    y <- suppressWarnings(as.numeric(x))
+    which(!is.na(y))
+}
+
 # read in the file, figure out how much to skip, read it in again, and rename the columns from the first test file
 read_cdmo_keepNAs <- function(file,
                       worksheet = NULL,
@@ -52,9 +58,11 @@ read_cdmo <- function(file,
     
     # headers are always top row; unknown number of explanatory rows below that
     
+    NAs <- c("", "NA", "N/A", "na")
+    
     to_mod <- read_xlsx(file,
                         n_max = 10,
-                        na = c("", "NA", "N/A"),
+                        na = NAs,
                         sheet = worksheet)
     
     # which column has "Lat" in it? This should be numeric.
@@ -70,7 +78,7 @@ read_cdmo <- function(file,
     dat <- read_xlsx(file,
                      sheet = worksheet,
                      skip = skip,
-                     na = c("", "NA", "N/A"),
+                     na = NAs,
                      col_names = FALSE)
     
     # reassign names, from original sheet
