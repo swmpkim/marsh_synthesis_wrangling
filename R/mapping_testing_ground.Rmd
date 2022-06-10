@@ -57,7 +57,7 @@ source(here::here("R", "sourced", "00_helper_functions.R"))
 ### APA  
 
 ```{r}
-file_in <- here::here(path_start, "APA", "Data", "APAVEG2020MOD.xlsx")
+file_in <- here::here(path_start, "APA", "APAVEG2020.xlsx")
 apa <- read_cdmo(file_in)
 bind_coords(apa)
 ```
