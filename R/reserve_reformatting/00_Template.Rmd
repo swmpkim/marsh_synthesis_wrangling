@@ -87,6 +87,9 @@ for(i in seq_along(to_read)){
     dat_in[[i]] <- read_cdmo(here::here(path_start, to_read[i])) 
 }
 
+# find out if any columns aren't the same type
+janitor::compare_df_cols_same(dat_in)
+
 dat_all <- bind_rows(dat_in)
 ```
 
