@@ -1,7 +1,7 @@
 ---
-title: "Individual Reserve Template"
+title: "LKS"
 author: "Kim Cressman"
-date: "2022-05-25; latest update `r Sys.Date()`"
+date: "2022-05-25; latest update 2022-06-10"
 output: 
     html_document:
         toc: true
@@ -44,8 +44,9 @@ Update for each reserve: all start at  `here::here("submitted_data", "data")` bu
 Also create an output folder for each reserve in the `wrangled data` folder and update the `path_out` below.  
 
 ```{r}
-path_start <- here::here("submitted_data", "data")
-path_out <- here::here("wrangled_data")
+path_start <- here::here("submitted_data", "data", "LKS",
+                         "LKS NERR VegMonitoring 2014-2020_PROVISIONAL.xlsx")
+path_out <- here::here("wrangled_data", "LKS")
 
 # create the output folder if it doesn't already exist
 if(!dir.exists(path_out)){
@@ -54,24 +55,14 @@ if(!dir.exists(path_out)){
 ```
 
 
-What are the files?  
+Years are individual worksheets within the same file.  
 
-```{r}
-dir(path_start)  
-```
 
 Which ones to read in?  **MODIFY FOR EACH RESERVE**  
 
 ```{r}
-files_all <- dir(path_start) 
-
-# figure out which ones match the pattern APAVEG[yyyy].xlsx:
-# str_which(files_all, "APAVEG\\d{4}\\.xlsx")
-# \\d for digit; {4} for 'exactly 4 times'; \\. for . only (otherwise it's a class)
-# stack overflow regex tutorial: https://stackoverflow.com/questions/4736/learning-regular-expressions
-files_matching <- str_which(files_all, "APAVEG\\d{4}\\.xlsx")
-
-to_read <- files_all[files_matching]
+sheets_all <- readxl::excel_sheets(path_start)
+to_read <- sheets_all[check_num3(sheets_all)]
 ```
 
 Read into a list and combine  **MODIFY FOR DIFFERENT DATA TYPES**  
@@ -84,8 +75,17 @@ This section will compile code to read in and combine files that are already in 
 dat_in <- list()
 
 for(i in seq_along(to_read)){
-    dat_in[[i]] <- read_cdmo(here::here(path_start, to_read[i])) 
+    dat_in[[i]] <- read_cdmo(here::here(path_start),
+                             worksheet = to_read[i]) 
 }
+
+
+# # % cover is character in some of them
+# purrr::map(dat_in, ~class(.x$`% Cover`))
+# purrr::map(dat_in, ~unique(.x$`% Cover`))
+# # "na" in the first file. Adding to read_cdmo function as a version of "NA".
+# resolved
+
 
 dat_all <- bind_rows(dat_in)
 ```
@@ -109,19 +109,31 @@ Include subplot if used by reserve. Want an empty tibble below.
 ```{r}
 unique(dat_all$Subplot)
 
-# subplot included
-dat_all %>% 
-   group_by(Date, SiteID, TransectID, PlotID, Subplot, Species) %>% 
-    tally() %>% 
-    filter(n > 1) %>% 
-    select(Date:Species, n)
-
-# # no subplot included
+# # subplot included
 # dat_all %>% 
-#    group_by(Date, SiteID, TransectID, PlotID,  Species) %>% 
+#    group_by(Date, SiteID, TransectID, PlotID, Subplot, Species) %>% 
 #     tally() %>% 
 #     filter(n > 1) %>% 
 #     select(Date:Species, n)
+
+# no subplot included
+dat_all %>%
+   group_by(Date, SiteID, TransectID, PlotID,  Species) %>%
+    tally() %>%
+    filter(n > 1) %>%
+    select(Date:Species, n)
+
+dat_all %>%
+   group_by(Date, SiteID, TransectID, PlotID,  Species) %>%
+    janitor::get_dupes() %>% 
+    View()
+
+# dat_all %>% 
+#     filter(SiteID == "PO",
+#            TransectID %in% c(4.3, 2.3),
+#            PlotID %in% c(1, 3),
+#            Species %in% c("Lemna minor", "Utricularia vulgaris")) %>% 
+#     View()
 ```
 
 
