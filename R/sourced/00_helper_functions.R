@@ -9,6 +9,7 @@ skip_fun <- function(x){
     max(which(is.na(y))) + 1
 }
 
+# find which items CANNOT be converted to numeric
 check_num2 <- function(x){
     y <- suppressWarnings(as.numeric(x))
     which(is.na(y))
