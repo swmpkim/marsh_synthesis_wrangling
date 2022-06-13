@@ -171,6 +171,8 @@ names(hts_sheet) <- str_replace(names(hts_sheet), "^(Average Canopy Height_)", "
 
 If different Lat/Longs are recorded for the same plot, they are averaged to create this table.  
 
+SAME FOR ORTHOMETRIC HEIGHT AND HEIGHT RELATIVE TO MLLW  
+
 ```{r}
 coords <- dat %>% 
     select(SiteID, TransectID, PlotID, "SSAM-1",
@@ -186,6 +188,9 @@ elevs <- dat %>%
            Distance, "Orthometric_Height",
            "Height_Relative_to_MLLW") %>% 
     distinct() %>% 
+    group_by(SiteID, TransectID, PlotID) %>% 
+    summarize(Orthometric_Height = mean(Orthometric_Height, na.rm = TRUE),
+              Height_Relative_to_MLLW = mean(Height_Relative_to_MLLW, na.rm = TRUE)) %>%
     arrange(SiteID, TransectID, PlotID)
 
 
