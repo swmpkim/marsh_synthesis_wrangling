@@ -235,6 +235,9 @@ dat_cdmo <- dat_all %>%
         "Reserve",
         "Type",
         "Date",
+        "Year",
+        "Month",
+        "Day",
         "SiteID",
         "TransectID",
         "PlotID",
@@ -249,11 +252,12 @@ dat_cdmo <- dat_all %>%
         "Species",
         "Cover",
         "Density",
-        "Maximum Canopy Height",
-        "Average Canopy Height",
+        "Canopy Height",
         "Diameter",
         "Height",
-        "QAQC"
+        "QAQC",
+        "Notes" = NOTES,
+        "Water depth"
     )
 ```
 
@@ -261,7 +265,7 @@ dat_cdmo <- dat_all %>%
 ## Write the CDMO data frame to a file. **Modify for each reserve**  
 
 ```{r}
-write_xlsx(dat_cdmo, path = here::here(path_out, "Reserve_CDMO.xlsx"),
+write_xlsx(dat_cdmo, path = here::here(path_out, "MAR_CDMO.xlsx"),
            format_headers = TRUE)
 ```
 
