@@ -46,6 +46,7 @@ Also create an output folder for each reserve in the `wrangled data` folder and 
 ```{r}
 path_start <- here::here("submitted_data", "data", "LKS",
                          "LKS NERR VegMonitoring 2014-2020_PROVISIONAL.xlsx")
+problem_path_out <- here::here("wrangled_data", "combined_with_issues")
 path_out <- here::here("wrangled_data", "LKS")
 
 # create the output folder if it doesn't already exist
@@ -217,30 +218,35 @@ dat_cdmo <- dat_all %>%
         "Reserve",
         "Type",
         "Date",
+        "Year",
+        "Month",
+        "Day",
         "SiteID",
         "TransectID",
         "PlotID",
         "Subplot",
         "Rep",
-        "SSAM-1",
-        "Lat",
-        "Long",
+        "Lat" = Latitude,
+        "Long" = Longitude,
         "Distance",
-        "Orthometric Height",
-        "Height Relative to MLLW",
+        "Orthometric Height" = Elevation,
         "Species",
-        "Cover",
+        "Cover" = `% Cover`,
         "Density",
-        "Maximum Canopy Height",
-        "Average Canopy Height",
-        "Diameter",
-        "Height",
-        "QAQC"
+        "Canopy Height",
+        everything()
     )
 ```
 
 
 ## Write the CDMO data frame to a file. **Modify for each reserve**  
+
+```{r}
+write.csv(dat_cdmo, here::here(problem_path_out, "LKS_issues.csv"), 
+          row.names= FALSE,
+          na = "")
+```
+
 
 ```{r}
 write_xlsx(dat_cdmo, path = here::here(path_out, "Reserve_CDMO.xlsx"),

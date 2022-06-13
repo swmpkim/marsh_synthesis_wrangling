@@ -185,6 +185,9 @@ dat_all %>%
 
 ```{r}
 unique(dat_all$Reserve)
+```
+
+```{r}
 dat_all %>% 
     select(Reserve, SiteID, TransectID, PlotID) %>% 
     distinct() %>% 
