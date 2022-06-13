@@ -46,6 +46,7 @@ Also create an output folder for each reserve in the `wrangled data` folder and 
 ```{r}
 path_start <- here::here("submitted_data", "data", "KAC", "Recent data")
 path2_start <- here::here("submitted_data", "data", "KAC", "Data from CDMO")
+problem_path_out <- here::here("wrangled_data", "combined_with_issues")
 path_out <- here::here("wrangled_data", "KAC")
 
 # create the output folder if it doesn't already exist
@@ -137,15 +138,14 @@ To reconcile:
 Several values in the `% Cover` Column are "R": per the metadata, this means "Trace", or <1%. For our purposes, am converting to 0.1.  
 
 ```{r}
-dat_all2 <- dat_all %>% 
+dat_all <- dat_all %>% 
     mutate(`% Cover` = case_when(`% Cover` == "R" ~ "0.1",
                                  TRUE ~ `% Cover`),
            `% Cover` = as.numeric(`% Cover`),
            Cover = case_when(!is.na(`% Cover`) ~ `% Cover`,
                              TRUE ~ Cover),
            `Orthometric Height` = case_when(!is.na(Elevation) ~ (Elevation/100),
-                                     TRUE ~ `Orthometric Height`),
-           Date = format(Date, "%m/%d/%Y")
+                                     TRUE ~ `Orthometric Height`)
            ) %>% 
     select(-`% Cover`, -`Elevation`)
 ```
@@ -261,6 +261,9 @@ dat_cdmo <- dat_all %>%
         "Reserve",
         "Type",
         "Date",
+        "Year",
+        "Month",
+        "Day",
         "SiteID",
         "TransectID",
         "PlotID",
@@ -275,8 +278,7 @@ dat_cdmo <- dat_all %>%
         "Species",
         "Cover",
         "Density",
-        "Maximum Canopy Height",
-        "Average Canopy Height",
+        "Canopy Height",
         "Diameter",
         "Height",
         "QAQC"
@@ -305,6 +307,12 @@ dat_cdmo %>%
 
 
 ## Write the CDMO data frame to a file. **Modify for each reserve**  
+
+```{r}
+write.csv(dat_cdmo, here::here(problem_path_out, "KAC_issues.csv"), 
+          row.names= FALSE,
+          na = "")
+```
 
 ```{r}
 write_xlsx(dat_cdmo, path = here::here(path_out, "Reserve_CDMO.xlsx"),
