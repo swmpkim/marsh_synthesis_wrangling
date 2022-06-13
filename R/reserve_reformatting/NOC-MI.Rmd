@@ -46,7 +46,7 @@ Also create an output folder for each reserve in the `wrangled data` folder and 
 ```{r}
 path_start <- here::here("submitted_data", "data", "NOC", "Masonboro_Island_component")
 problem_path_out <- here::here("wrangled_data", "combined_with_issues")
-path_out <- here::here("wrangled_data", "NOC_MI")
+path_out <- here::here("wrangled_data", "CDMO")
 
 # create the output folder if it doesn't already exist
 if(!dir.exists(path_out)){
@@ -234,14 +234,15 @@ dat_cdmo <- dat_all %>%
         "Long",
         "Distance",
         "Orthometric Height",
+        "Height Relative to MLLW" = "Tidal Height",
         "Species",
         "Cover",
         "Density",
         "Canopy Height",
         "Diameter",
-        "Height",
-        everything()
-    )
+        "Height"
+    ) %>% 
+    mutate(QAQC = NA_character_)
 ```
 
 
