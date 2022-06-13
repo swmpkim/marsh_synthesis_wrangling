@@ -45,6 +45,7 @@ Also create an output folder for each reserve in the `wrangled data` folder and 
 
 ```{r}
 path_start <- here::here("submitted_data", "data", "NOC", "Zekes_Island_component")
+problem_path_out <- here::here("wrangled_data", "combined_with_issues")
 path_out <- here::here("wrangled_data", "NOC_ZI")
 
 # create the output folder if it doesn't already exist
@@ -221,6 +222,9 @@ dat_cdmo <- dat_all %>%
         "Reserve",
         "Type",
         "Date",
+        "Year",
+        "Month",
+        "Day",
         "SiteID",
         "TransectID",
         "PlotID",
@@ -231,15 +235,13 @@ dat_cdmo <- dat_all %>%
         "Long",
         "Distance",
         "Orthometric Height",
-        "Height Relative to MLLW",
         "Species",
         "Cover",
         "Density",
-        "Maximum Canopy Height",
-        "Average Canopy Height",
+        "Canopy Height",
         "Diameter",
         "Height",
-        "QAQC"
+        everything()
     )
 ```
 
@@ -247,7 +249,14 @@ dat_cdmo <- dat_all %>%
 ## Write the CDMO data frame to a file. **Modify for each reserve**  
 
 ```{r}
-write_xlsx(dat_cdmo, path = here::here(path_out, "Reserve_CDMO.xlsx"),
+# no problems with this file
+# write.csv(dat_cdmo, here::here(problem_path_out, "NOC-ZI_issues.csv"), 
+#           row.names= FALSE,
+#           na = "")
+```
+
+```{r}
+write_xlsx(dat_cdmo, path = here::here(path_out, "NOC-ZI_CDMO.xlsx"),
            format_headers = TRUE)
 ```
 
