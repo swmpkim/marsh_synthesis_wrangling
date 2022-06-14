@@ -13,6 +13,29 @@ knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(readxl)
 library(writexl)
+
+
+# function to pick first non-NA reading for any given plot ("at establishment")
+establ <- function(df, x){
+    
+    x_vec <- df %>% 
+        select({{x}})
+    
+    if(sum(!is.na(x_vec)) == 0){
+        out <- df %>% 
+            select(SiteID, TransectID, PlotID, {{x}}) %>% 
+            distinct() 
+    } else {
+        out <- df %>% 
+            select(Date, SiteID, TransectID, PlotID, {{x}}) %>% 
+            distinct() %>% 
+            group_by(SiteID, TransectID, PlotID) %>% 
+            filter(!is.na({{x}})) %>%
+            filter(Date == min(Date)) 
+    }
+        
+    out
+}
 ```
 
 # Identify file to read in  
@@ -183,16 +206,12 @@ coords <- dat %>%
               Long = mean(Long, na.rm = TRUE)) %>% 
     arrange(SiteID, TransectID, PlotID)
 
-elevs <- dat %>% 
-    select(SiteID, TransectID, PlotID, "SSAM-1",
-           Distance, "Orthometric_Height",
-           "Height_Relative_to_MLLW") %>% 
-    distinct() %>% 
-    group_by(SiteID, TransectID, PlotID) %>% 
-    summarize(Orthometric_Height = mean(Orthometric_Height, na.rm = TRUE),
-              Height_Relative_to_MLLW = mean(Height_Relative_to_MLLW, na.rm = TRUE)) %>%
-    arrange(SiteID, TransectID, PlotID)
-
+lats <- establ(dat, Lat)
+longs <- establ(dat, Long)
+ssam1 <- establ(dat, "SSAM-1")
+dists <- establ(dat, Distance)
+orth_hts <- establ(dat, Orthometric_Height) 
+mllw_hts <- establ(dat, Height_Relative_to_MLLW)
 
 if(nrow(coords) == nrow(elevs)){
     stn_tbl <- full_join(coords, elevs)
