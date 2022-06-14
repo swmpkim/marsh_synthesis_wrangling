@@ -31,7 +31,8 @@ establ <- function(df, x){
             distinct() %>% 
             group_by(SiteID, TransectID, PlotID) %>% 
             filter(!is.na({{x}})) %>%
-            filter(Date == min(Date)) 
+            filter(Date == min(Date)) %>% 
+            select(-Date)
     }
         
     out
@@ -192,32 +193,38 @@ names(hts_sheet) <- str_replace(names(hts_sheet), "^(Average Canopy Height_)", "
 
 # Station Table  
 
-If different Lat/Longs are recorded for the same plot, they are averaged to create this table.  
+Everything in this table is the first recorded value.  
 
-SAME FOR ORTHOMETRIC HEIGHT AND HEIGHT RELATIVE TO MLLW  
 
 ```{r}
-coords <- dat %>% 
-    select(SiteID, TransectID, PlotID, "SSAM-1",
-           Lat, Long) %>% 
-    distinct() %>% 
-    group_by(SiteID, TransectID, PlotID) %>% 
-    summarize(Lat = mean(Lat, na.rm = TRUE),
-              Long = mean(Long, na.rm = TRUE)) %>% 
-    arrange(SiteID, TransectID, PlotID)
+# coords <- dat %>% 
+#     select(SiteID, TransectID, PlotID, "SSAM-1",
+#            Lat, Long) %>% 
+#     distinct() %>% 
+#     group_by(SiteID, TransectID, PlotID) %>% 
+#     summarize(Lat = mean(Lat, na.rm = TRUE),
+#               Long = mean(Long, na.rm = TRUE)) %>% 
+#     arrange(SiteID, TransectID, PlotID)
 
+stns <- dat %>% 
+    select(Reserve, SiteID, TransectID, PlotID) %>% 
+    distinct()
 lats <- establ(dat, Lat)
 longs <- establ(dat, Long)
 ssam1 <- establ(dat, "SSAM-1")
 dists <- establ(dat, Distance)
 orth_hts <- establ(dat, Orthometric_Height) 
 mllw_hts <- establ(dat, Height_Relative_to_MLLW)
+types <- establ(dat, Type)
 
-if(nrow(coords) == nrow(elevs)){
-    stn_tbl <- full_join(coords, elevs)
-} else {
-    warning("The number of stations does not match between tables. Something is duplicated.")
-}
+stn_tbl <- full_join(stns, lats) %>% 
+    full_join(longs) %>% 
+    full_join(types) %>% 
+    full_join(orth_hts) %>% 
+    full_join(mllw_hts) %>%
+    full_join(dists) %>% 
+    full_join(ssam1)
+
 ```
 
 
