@@ -1,0 +1,52 @@
+---
+title: "Species list"
+author: "Kim Cressman"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+```
+
+
+```{r}
+reserves <- c("APA", "GND", "KAC", "LKS", "NOC-MI", "NOC-RC", "NOC-ZI")
+```
+
+```{r}
+for(i in seq_along(reserves)){
+    reserve <- reserves[i]
+    
+    path <- here::here("wrangled_data", "combined_with_issues", paste0(reserve, "_fixed.csv"))
+    
+    out_path1 <- here::here("wrangled_data", "combined_with_issues", paste0(reserve, "_issuesRound2.csv")) 
+    
+    out_path2 <- here::here("wrangled_data", "combined_with_issues", paste0(reserve, "_species.csv")) 
+    
+    dat <- read_csv(path)
+    dat$Species <- str_replace(dat$Species, pattern = "  ", replacement = " ")
+    
+    spp <- dat %>% 
+        group_by(Species) %>% 
+        tally()
+    
+    write.csv(dat, out_path1, row.names = FALSE)
+    write.csv(spp, out_path2, row.names = FALSE)
+}
+
+```
+
+
+```{r}
+test <- dat$Species
+test2 <- str_replace(test, pattern = "  ", replacement = " ")
+
+dat2 <- dat
+dat2$Species <- str_replace(dat2$Species, pattern = "  ", replacement = " ")
+```
+

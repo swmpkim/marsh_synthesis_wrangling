@@ -1,5 +1,5 @@
 ---
-title: "Individual Reserve Template"
+title: "CBV"
 author: "Kim Cressman"
 date: "2022-05-25; latest update `r Sys.Date()`"
 output: 
@@ -26,7 +26,7 @@ library(leaflet)
 library(rgdal)
 library(stringi)  # for stri_sub_replace()
 
-reserve <- "CODEHERE"
+reserve <- "CBV"
 ```
 
 # Setup  
@@ -41,13 +41,14 @@ source(here::here("R", "sourced", "00_helper_functions.R"))
 
 ## Data path  
 
-Update for each reserve: all start at  `here::here("submitted_data", "data")` but it varies by reserve.   
-
-Also create an output folder for each reserve in the `wrangled data` folder and update the `path_out` below.  
+Just one file to read here.
 
 ```{r}
-path_start <- here::here("submitted_data", "data", reserve)
+path_start <- here::here("submitted_data", "data", reserve, 
+                         "CBNERRVA Veg Data GI Reserve for Chris Peter.xlsx")
+
 problem_path_out <- here::here("wrangled_data", "combined_with_issues")
+
 path_out <- here::here("wrangled_data", "CDMO")
 
 # create the output folder if it doesn't already exist
@@ -57,26 +58,6 @@ if(!dir.exists(path_out)){
 ```
 
 
-What are the files?  
-
-```{r}
-dir(path_start)  
-```
-
-Which ones to read in?  **MODIFY FOR EACH RESERVE**  
-
-```{r}
-files_all <- dir(path_start) 
-
-# figure out which ones match the pattern APAVEG[yyyy].xlsx:
-# str_which(files_all, "APAVEG\\d{4}\\.xlsx")
-# \\d for digit; {4} for 'exactly 4 times'; \\. for . only (otherwise it's a class)
-# stack overflow regex tutorial: https://stackoverflow.com/questions/4736/learning-regular-expressions
-files_matching <- str_which(files_all, "APAVEG\\d{4}\\.xlsx")
-
-to_read <- files_all[files_matching]
-```
-
 Read into a list and combine  **MODIFY FOR DIFFERENT DATA TYPES**  
 
 # CDMO formatted input  
@@ -84,16 +65,7 @@ Read into a list and combine  **MODIFY FOR DIFFERENT DATA TYPES**
 This section will compile code to read in and combine files that are already in CDMO format. Then a long CDMO-format file will be generated, after reconciling column names, dates, and putting things in order. The NaMaSTe template file will be generated from the CDMO-format file.  
 
 ```{r}
-dat_in <- list()
-
-for(i in seq_along(to_read)){
-    dat_in[[i]] <- read_cdmo(here::here(path_start, to_read[i])) 
-}
-
-# find out if any columns aren't the same type
-janitor::compare_df_cols_same(dat_in)
-
-dat_all <- bind_rows(dat_in)
+dat_all <- read_cdmo(path_start)
 ```
 
 
@@ -115,19 +87,28 @@ Include subplot if used by reserve. Want an empty tibble below.
 ```{r}
 unique(dat_all$Subplot)
 
-# subplot included
-dat_all %>% 
-   group_by(Date, SiteID, TransectID, PlotID, Subplot, Species) %>% 
-    tally() %>% 
-    filter(n > 1) %>% 
-    select(Date:Species, n)
-
-# # no subplot included
+# # subplot included
 # dat_all %>% 
-#    group_by(Date, SiteID, TransectID, PlotID,  Species) %>% 
+#    group_by(Date, SiteID, TransectID, PlotID, Subplot, Species) %>% 
 #     tally() %>% 
 #     filter(n > 1) %>% 
 #     select(Date:Species, n)
+
+# no subplot included
+dat_all %>%
+   group_by(Date, SiteID, TransectID, PlotID,  Species) %>%
+    tally() %>%
+    filter(n > 1) %>%
+    select(Date:Species, n)
+
+# just one dupe: 
+
+# dat_all %>%
+#     filter(SiteID == "GI",
+#            TransectID == "T1",
+#            PlotID == "P12",
+#            Species == "IVAFRU") %>% 
+#     View()
 ```
 
 
@@ -196,6 +177,7 @@ spp_out_path <- here::here("wrangled_data", "combined_with_issues", paste0(reser
 
 write.csv(spp, spp_out_path, row.names = FALSE)
 ```
+
 
 # Fix discrepancies  
 
