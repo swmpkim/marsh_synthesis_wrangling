@@ -1,5 +1,5 @@
 ---
-title: "Grand Bay"
+title: "Delaware - SJR component"
 author: "Kim Cressman"
 date: "2022-05-25; latest update `r Sys.Date()`"
 output: 
@@ -44,9 +44,8 @@ Update for each reserve: all start at  `here::here("submitted_data", "data")` bu
 Also create an output folder for each reserve in the `wrangled data` folder and update the `path_out` below.  
 
 ```{r}
-path_start <- here::here("submitted_data", "data", "GND", "Veg Data and Metadata")
-problem_path_out <- here::here("wrangled_data", "combined_with_issues")
-path_out <- here::here("wrangled_data", "GND")
+path_start <- here::here("submitted_data", "data")
+path_out <- here::here("wrangled_data")
 
 # create the output folder if it doesn't already exist
 if(!dir.exists(path_out)){
@@ -70,7 +69,7 @@ files_all <- dir(path_start)
 # str_which(files_all, "APAVEG\\d{4}\\.xlsx")
 # \\d for digit; {4} for 'exactly 4 times'; \\. for . only (otherwise it's a class)
 # stack overflow regex tutorial: https://stackoverflow.com/questions/4736/learning-regular-expressions
-files_matching <- str_which(files_all, "GNDVEG\\d{4}\\.xlsx")
+files_matching <- str_which(files_all, "APAVEG\\d{4}\\.xlsx")
 
 to_read <- files_all[files_matching]
 ```
@@ -85,46 +84,10 @@ This section will compile code to read in and combine files that are already in 
 dat_in <- list()
 
 for(i in seq_along(to_read)){
-    dat_in_tmp <- read_cdmo(here::here(path_start, to_read[i])) 
-    
-    if(is.character(dat_in_tmp$Cover)){
-        dat_in_tmp <- dat_in_tmp %>% 
-            mutate(Cover = case_when(Cover == "<5" ~ "2.5",
-                                     TRUE ~ Cover),
-                   Cover = as.numeric(Cover))
-    }
-    
-    dat_in[[i]] <- dat_in_tmp
+    dat_in[[i]] <- read_cdmo(here::here(path_start, to_read[i])) 
 }
 
-
-# # bind_rows error on Date
-# for(i in 1:length(dat_in)){
-#     cat(to_read[i], "\n", class(dat_in[[i]]$Date), "\n \n")
-# }
-# 
-# # 2015 file: date is character. POSIXct in all other files.
-# veg2015 <- dat_in[[1]]
-# unique(veg2015$Date)
-# # ahhh, there's an N/A.
-# # added "N/A" to read_cdmo function and this resolved the issue.
-
-
-# # bind_rows error on Cover (after Date was resolved)
-# for(i in 1:length(dat_in)){
-#     cat(to_read[i], "\n", class(dat_in[[i]]$Cover), "\n \n")
-# }
-# 
-# # also 2015 file: date is character. POSIXct in all other files.
-# veg2015 <- dat_in[[1]]
-# unique(veg2015$Cover)
-# # got a "<5". In other files there are 2.5s, which is probably how "<5" got translated in those. That is what I'll do with cover for GND.
-# # resolved by adding an extra step in the read-in loop. If Cover is character, then mutate it to turn <5 into 2.5 and everything into a number.
-
-
-dat_all <- bind_rows(dat_in) %>% 
-    select(-`QAQC flag/codes (defined in metadata Section 9)`)
-# QAQC flag/codes etc. column was just a definition and explanation; no actual info.
+dat_all <- bind_rows(dat_in)
 ```
 
 
@@ -144,23 +107,19 @@ names(dat_all)
 Include subplot if used by reserve. Want an empty tibble below.    
 
 ```{r}
-# # subplot included
+# subplot included
+dat_all %>% 
+   group_by(Date, SiteID, TransectID, PlotID, Subplot, Species) %>% 
+    tally() %>% 
+    filter(n > 1) %>% 
+    select(Date:Species, n)
+
+# # no subplot included
 # dat_all %>% 
-#    group_by(Date, SiteID, TransectID, PlotID, Subplot, Species) %>% 
+#    group_by(Date, SiteID, TransectID, PlotID,  Species) %>% 
 #     tally() %>% 
 #     filter(n > 1) %>% 
 #     select(Date:Species, n)
-
-# no subplot included
-dat_all %>%
-   group_by(Date, SiteID, TransectID, PlotID,  Species) %>%
-    tally() %>%
-    filter(n > 1) %>%
-    select(Date:Species, n) %>% 
-    View()
-# 100 replicated rows:
-# 2016-10-05 and 10-07 clamj, 13 replicates of each Cladium  jamaicense and Ipomoea  sagittata reading
-# 2020-08-06 juro mid, 2 replicates of each Dichanthelium sp. reading
 ```
 
 
@@ -244,9 +203,6 @@ dat_cdmo <- dat_all %>%
         "Reserve",
         "Type",
         "Date",
-        "Year",
-        "Month",
-        "Day",
         "SiteID",
         "TransectID",
         "PlotID",
@@ -261,7 +217,8 @@ dat_cdmo <- dat_all %>%
         "Species",
         "Cover",
         "Density",
-        "Canopy Height",
+        "Maximum Canopy Height",
+        "Average Canopy Height",
         "Diameter",
         "Height",
         "QAQC"
@@ -270,13 +227,6 @@ dat_cdmo <- dat_all %>%
 
 
 ## Write the CDMO data frame to a file. **Modify for each reserve**  
-
-```{r}
-write.csv(dat_cdmo, here::here(problem_path_out, "GND_issues.csv"), 
-          row.names= FALSE,
-          na = "")
-```
-
 
 ```{r}
 write_xlsx(dat_cdmo, path = here::here(path_out, "Reserve_CDMO.xlsx"),

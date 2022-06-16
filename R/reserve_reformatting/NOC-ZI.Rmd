@@ -179,9 +179,9 @@ The following sums will be 0 if none of the genus names were found in the specie
 ```{r}
 spp_all <- sort(unique(dat_all$Species))
 knitr::kable(spp_all)
-sum(str_detect("Avic", spp_all))
-sum(str_detect("Lagunc", spp_all))
-sum(str_detect("Rhizo", spp_all))
+sum(str_detect(spp_all, "Avic"))
+sum(str_detect(spp_all, "Lagunc"))
+sum(str_detect(spp_all, "Rhizo"))
 
 ```
 

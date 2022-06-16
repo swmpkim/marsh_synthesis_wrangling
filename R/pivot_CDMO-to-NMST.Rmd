@@ -44,7 +44,7 @@ establ <- function(df, x){
 In a Shiny app, let someone pick this interactively. Here, hard-code. Using MAR because it's the first full working file I have. NOC-ZI is also good.  
 
 ```{r}
-reserve <- "NOC-ZI"
+reserve <- "MAR"
 
 # path <- here::here("wrangled_data", "CDMO", "MAR_CDMO.xlsx")
 path <- here::here("wrangled_data", "CDMO", paste0(reserve, "_CDMO.xlsx"))
