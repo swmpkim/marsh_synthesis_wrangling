@@ -44,10 +44,11 @@ establ <- function(df, x){
 In a Shiny app, let someone pick this interactively. Here, hard-code. Using MAR because it's the first full working file I have. NOC-ZI is also good.  
 
 ```{r}
-# reserve <- "APA"  
-# reserve <- "GND"  
-reserve <- "KAC"
-# reserve <- "LKS"
+# reserve <- "APA"  # contains Average and Maximum Canopy Height
+# reserve <- "CBM-JB"  # Maximum Canopy Height
+# reserve <- "GND"  # completed 6/17/12
+# reserve <- "KAC"  # completed 6/17/22
+reserve <- "LKS"
 # reserve <- "MAR"  # completed 6/17/22
 # reserve <- "NOC-MI"
 # reserve <- "NOC-RC"
@@ -76,6 +77,14 @@ Read in data and rename:
 dat <- read_xlsx(path,
                  guess_max = 2500) %>% 
     rename(any_of(col_matching))
+```
+
+If QAQC column doesn't exist, add one full of NAs.  
+
+```{r}
+if(!exists("QAQC", dat)){
+  dat$QAQC <- NA  
+}
 ```
 
 
