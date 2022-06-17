@@ -1,7 +1,7 @@
 ---
 title: "CDMO-to-NMST"
 author: "Kim Cressman"
-date: "6/13/2022"
+date: "latest update: 6/17/2022"
 output: html_document
 ---
 
@@ -46,12 +46,12 @@ In a Shiny app, let someone pick this interactively. Here, hard-code. Using MAR 
 ```{r}
 # reserve <- "APA"  # need to deal with avg and max canopy height
 # reserve <- "GND"  # completed 6/16/22
-reserve <- "KAC"
-reserve <- "LKS"
-# reserve <- "MAR"  # completed 6/14/22
-reserve <- "NOC-MI"
-reserve <- "NOC-RC"
-reserve <- "NOC-ZI"
+# reserve <- "KAC"
+# reserve <- "LKS"
+reserve <- "MAR"  # completed 6/14/22
+# reserve <- "NOC-MI"
+# reserve <- "NOC-RC"
+# reserve <- "NOC-ZI"
 ```
 
 ```{r}
@@ -160,6 +160,40 @@ hts <- dat %>%
                 names_prefix = "Average Canopy Height_")
 ```
 
+
+## Mangrove height and diameter  
+
+if applicable.  
+
+```{r}
+spp_all <- sort(unique(dat$Species))
+
+# are mangroves present in the species list
+mangroves <- sum(str_detect(spp_all, "Avic")) + sum(str_detect(spp_all, "Lagunc")) + sum(str_detect(spp_all, "Rhizo"))
+
+# what are those species
+mang_spp <- spp_all[str_which(spp_all, "Avic")]
+
+if(mangroves > 0){
+    dat_mang_ht <- dat %>% 
+        filter(Species %in% mang_spp) %>% 
+        select(all_of(id_names), Species, Height) %>% 
+        pivot_wider(names_from = Species,
+                values_from = Height,  # Height in original dataset is mangrove height
+                names_prefix = "Height_")
+    
+    dat_mang_diam <- dat %>% 
+        filter(Species %in% mang_spp) %>% 
+        select(all_of(id_names), Species, Diameter) %>% 
+        pivot_wider(names_from = Species,
+                values_from = Diameter,  # Height in original dataset is mangrove height
+                names_prefix = "Diameter_")
+    
+    dat_mang <- full_join(dat_mang_ht, dat_mang_diam)
+}
+```
+
+
 ## Join them all  
 
 ```{r}
@@ -169,6 +203,12 @@ covr_sheet <- full_join(covr_wide, dens) %>%
     select(all_of(id_names), Notes, everything()) %>% 
     relocate(Notes, .after = Distance) %>% 
     relocate(starts_with("F_"), .after = last_col())
+
+# join in mangrove heights and diameters too
+if(mangroves > 0){
+    covr_sheet <- full_join(covr_sheet, dat_mang) %>% 
+        relocate(starts_with("F_"), .after = last_col())
+}
 ```
 
 
