@@ -165,6 +165,8 @@ dat_all %>%
 
 ### 'Distance' discrepancies  
 
+Distance for RR T1 P4 has 70 and 40. 40 is only used 5 times (all in 2010) so it is probably wrong. Metadata also shows distance 70 for this plot.
+
 ```{r}
 stn_dupes <- dat_all %>% 
     select(Reserve, SiteID, TransectID, PlotID,
@@ -174,27 +176,42 @@ stn_dupes <- dat_all %>%
 
 stn_dupes
 
-dat_all %>% 
-    select(Reserve, SiteID, TransectID, PlotID,
-           Distance) %>% 
-    group_by(Reserve, SiteID, TransectID, PlotID,
-           Distance) %>% 
-    tally() %>% 
-    arrange(n)
+# dat_all %>% 
+#     select(Reserve, SiteID, TransectID, PlotID,
+#            Distance) %>% 
+#     group_by(Reserve, SiteID, TransectID, PlotID,
+#            Distance) %>% 
+#     tally() %>% 
+#     arrange(n)
+# 
+# dat_all %>% 
+#     select(Reserve, SiteID, TransectID, PlotID,
+#            Distance) %>%
+#     filter(SiteID == "RR", TransectID == "T1") %>% 
+#     group_by(Reserve, SiteID, TransectID, PlotID,
+#            Distance) %>% 
+#     tally() %>% 
+#     arrange(PlotID)
+# 
+# dat_all %>% 
+#     select(Date, Year, SiteID, TransectID, PlotID,
+#            Distance) %>%
+#     filter(SiteID == "RR", TransectID == "T1", Distance == 40)
+# 
+# dat_all %>%
+#     select(Date, Year, SiteID, TransectID, PlotID,
+#            Distance) %>%
+#     filter(Year <= 2011, SiteID == "RR", TransectID == "T1") %>%
+#     distinct()
+```
 
-dat_all %>% 
-    select(Reserve, SiteID, TransectID, PlotID,
-           Distance) %>%
-    filter(SiteID == "RR", TransectID == "T1") %>% 
-    group_by(Reserve, SiteID, TransectID, PlotID,
-           Distance) %>% 
-    tally() %>% 
-    arrange(PlotID)
+Fix that distance issue.
 
-dat_all %>% 
-    select(Date, SiteID, TransectID, PlotID,
-           Distance) %>%
-    filter(SiteID == "RR", TransectID == "T1", Distance == 40)
+```{r}
+dat_all <- dat_all %>% 
+    mutate(UniqueID = paste(SiteID, TransectID, PlotID, Year, sep = "_"),
+           Distance = case_when(UniqueID == "RR_T1_P4_2010" ~ 70,
+                                TRUE ~ Distance))
 ```
 
 
@@ -296,20 +313,18 @@ dat_cdmo <- dat_all %>%
         "PlotID",
         "Subplot",
         "Rep",
-        "SSAM-1",
         "Lat",
         "Long",
         "Distance",
-        "Orthometric Height",
-        "Height Relative to MLLW",
+        "Orthometric Height" = Elevation,
         "Species",
-        "Cover",
+        "Hits",
+        "Cover" = "% Cover",
         "Density",
-        "Maximum Canopy Height",
-        "Average Canopy Height",
+        "Maximum Canopy Height" = "Canopy Height",
         "Diameter",
         "Height",
-        "QAQC"
+        "Notes"
     )
 ```
 
@@ -317,13 +332,13 @@ dat_cdmo <- dat_all %>%
 ## Write the CDMO data frame to a file. **Modify for each reserve**  
 
 ```{r}
-write.csv(dat_cdmo, here::here(problem_path_out, reserve, "_issues.csv"), 
-          row.names= FALSE,
-          na = "")
+# write.csv(dat_cdmo, here::here(problem_path_out, reserve, "_issues.csv"), 
+#           row.names= FALSE,
+#           na = "")
 ```
 
 ```{r}
-write_xlsx(dat_cdmo, path = here::here(path_out, reserve, "_CDMO.xlsx"),
+write_xlsx(dat_cdmo, path = here::here(path_out, paste0(reserve, "_CDMO.xlsx")),
            format_headers = TRUE)
 ```
 
