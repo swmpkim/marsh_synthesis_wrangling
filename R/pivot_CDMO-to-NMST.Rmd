@@ -44,11 +44,11 @@ establ <- function(df, x){
 In a Shiny app, let someone pick this interactively. Here, hard-code. Using MAR because it's the first full working file I have. NOC-ZI is also good.  
 
 ```{r}
-# reserve <- "APA"  # need to deal with avg and max canopy height
-# reserve <- "GND"  # completed 6/16/22
-# reserve <- "KAC"
+# reserve <- "APA"  
+# reserve <- "GND"  
+reserve <- "KAC"
 # reserve <- "LKS"
-reserve <- "MAR"  # completed 6/14/22
+# reserve <- "MAR"  # completed 6/17/22
 # reserve <- "NOC-MI"
 # reserve <- "NOC-RC"
 # reserve <- "NOC-ZI"
