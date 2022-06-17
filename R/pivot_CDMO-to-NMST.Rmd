@@ -48,10 +48,10 @@ In a Shiny app, let someone pick this interactively. Here, hard-code. Using MAR 
 # reserve <- "CBM-JB"  # Maximum Canopy Height
 # reserve <- "GND"  # completed 6/17/12
 # reserve <- "KAC"  # completed 6/17/22
-reserve <- "LKS"
+# reserve <- "LKS"  # waiting on Lemna dupe issue
 # reserve <- "MAR"  # completed 6/17/22
-# reserve <- "NOC-MI"
-# reserve <- "NOC-RC"
+# reserve <- "NOC-MI"  # completed 6/17/22
+reserve <- "NOC-RC"
 # reserve <- "NOC-ZI"
 ```
 
@@ -79,11 +79,23 @@ dat <- read_xlsx(path,
     rename(any_of(col_matching))
 ```
 
-If QAQC column doesn't exist, add one full of NAs.  
+Add required columns if they don't exist. QAQC, SSAM-1, OrthoHt, HtMLLW.
 
 ```{r}
 if(!exists("QAQC", dat)){
   dat$QAQC <- NA  
+}
+
+if(!exists("SSAM-1", dat)){
+  dat$`SSAM-1` <- NA  
+}
+
+if(!exists("Orthometric_Height", dat)){
+  dat$Orthometric_Height <- NA  
+}
+
+if(!exists("Height_Relative_to_MLLW", dat)){
+  dat$Height_Relative_to_MLLW <- NA  
 }
 ```
 
