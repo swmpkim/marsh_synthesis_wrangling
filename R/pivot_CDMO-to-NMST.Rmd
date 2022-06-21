@@ -52,7 +52,8 @@ In a Shiny app, let someone pick this interactively. Here, hard-code. Using MAR 
 # reserve <- "MAR"  # completed 6/17/22
 # reserve <- "NOC-MI"  # completed 6/17/22
 # reserve <- "NOC-RC"  # completed 6/17/22
-reserve <- "NOC-ZI"
+# reserve <- "NOC-ZI"  # completed 6/17/22
+reserve <- "GTM"  # completed 6/21/22
 ```
 
 ```{r}
