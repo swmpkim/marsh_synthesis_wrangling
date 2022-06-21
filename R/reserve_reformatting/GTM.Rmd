@@ -162,6 +162,10 @@ dat_all <- dat_all %>%
 
 ```{r}
 unique(dat_all$Reserve)
+```
+
+
+```{r}
 dat_all %>% 
     select(Reserve, SiteID, TransectID, PlotID) %>% 
     distinct() %>% 
@@ -175,10 +179,43 @@ dat_all %>%
 stn_dupes <- dat_all %>% 
     select(Reserve, SiteID, TransectID, PlotID,
            Distance) %>% 
+    mutate(uniqueID = paste(SiteID, TransectID, PlotID, sep = "_")) %>% 
     distinct() %>% 
     janitor::get_dupes(-Distance)
 
 stn_dupes
+# 
+# dat_all %>% 
+#     mutate(uniqueID = paste(SiteID, TransectID, PlotID, sep = "_")) %>% 
+#     filter(uniqueID %in% stn_dupes$uniqueID) %>% 
+#     group_by(uniqueID, Distance) %>% 
+#     tally()
+# 
+# dat_all %>% 
+#     mutate(uniqueID = paste(SiteID, TransectID, PlotID, sep = "_")) %>% 
+#     filter(uniqueID == "46_Lower_15") %>% 
+#     View()
+# 
+# dat_all %>% 
+#     mutate(uniqueID = paste(SiteID, TransectID, PlotID, sep = "_")) %>% 
+#     filter(uniqueID == "01_C_5") %>% 
+#     arrange(desc(Distance)) %>% 
+#     View()
+```
+
+
+### Fix the above discrepancies  
+
+
+```{r}
+dat_all <- dat_all %>% 
+    mutate(Reserve = case_when(Reserve != "GTM" ~ "GTM",
+                               TRUE ~ Reserve),
+           uniqueID = paste(SiteID, TransectID, PlotID, sep = "_"),
+           Distance = case_when(uniqueID == "01_C_5" ~ 6,
+                                uniqueID == "46_Lower_15" ~ 140,
+                                TRUE ~ Distance)) %>% 
+    select(-uniqueID)
 ```
 
 
@@ -252,8 +289,7 @@ dat_cdmo <- dat_all %>%
         "Species",
         "Cover",
         "Density",
-        "Maximum Canopy Height",
-        "Average Canopy Height",
+        "Canopy Height",
         "Diameter",
         "Height",
         "QAQC"
