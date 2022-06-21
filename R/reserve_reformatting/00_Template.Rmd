@@ -252,13 +252,13 @@ dat_cdmo <- dat_all %>%
 ## Write the CDMO data frame to a file. **Modify for each reserve**  
 
 ```{r}
-write.csv(dat_cdmo, here::here(problem_path_out, reserve, "_issues.csv"), 
+write.csv(dat_cdmo, here::here(problem_path_out, paste0(reserve, "_issues.csv")), 
           row.names= FALSE,
           na = "")
 ```
 
 ```{r}
-write_xlsx(dat_cdmo, path = here::here(path_out, reserve, "_CDMO.xlsx"),
+write_xlsx(dat_cdmo, path = here::here(path_out, paste0(reserve, "_CDMO.xlsx")),
            format_headers = TRUE)
 ```
 

@@ -25,6 +25,8 @@ library(writexl)
 library(leaflet)
 library(rgdal)
 library(stringi)  # for stri_sub_replace()
+
+reserve <- "GTM"
 ```
 
 # Setup  
@@ -44,8 +46,9 @@ Update for each reserve: all start at  `here::here("submitted_data", "data")` bu
 Also create an output folder for each reserve in the `wrangled data` folder and update the `path_out` below.  
 
 ```{r}
-path_start <- here::here("submitted_data", "data", "GTM")
-path_out <- here::here("wrangled_data", "GTM")
+path_start <- here::here("submitted_data", "data", reserve)
+problem_path_out <- here::here("wrangled_data", "combined_with_issues")
+path_out <- here::here("wrangled_data", "CDMO")
 
 # create the output folder if it doesn't already exist
 if(!dir.exists(path_out)){
@@ -300,7 +303,7 @@ dat_cdmo <- dat_all %>%
 ## Write the CDMO data frame to a file. **Modify for each reserve**  
 
 ```{r}
-write_xlsx(dat_cdmo, path = here::here(path_out, "Reserve_CDMO.xlsx"),
+write_xlsx(dat_cdmo, path = here::here(path_out, paste0(reserve, "_CDMO.xlsx")),
            format_headers = TRUE)
 ```
 
