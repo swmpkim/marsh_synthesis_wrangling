@@ -43,7 +43,8 @@ Also create an output folder for each reserve in the `wrangled data` folder and 
 
 ```{r}
 path_start <- here::here("submitted_data", "data", "NIW")
-path_out <- here::here("wrangled_data", "NIW")
+problem_path_out <- here::here("wrangled_data", "combined_with_issues")
+path_out <- here::here("wrangled_data", "CDMO")
 ```
 
 
@@ -279,7 +280,7 @@ dat_cdmo %>%
 ## Write the CDMO data frame to a file. **Modify for each reserve**  
 
 ```{r}
-write_xlsx(dat_cdmo, path = here::here(path_out, "Reserve_CDMO.xlsx"),
+write_xlsx(dat_cdmo, path = here::here(path_out, "NIW_CDMO.xlsx"),
            format_headers = TRUE)
 ```
 
