@@ -197,7 +197,28 @@ Code used to fix it in the mapping script was:
 #                             TRUE ~ Long))
 ```
 
+Fix here:  
 
+```{r}
+dat_all <- dat_all %>% 
+    mutate(id = paste(SiteID, TransectID, PlotID, sep = "-"),
+           Lat = case_when(id == "Segment B-3-3" ~ 33.34045339,
+                           TRUE ~ Lat),
+           Long = case_when(id == "Segment B-3-3" ~ -79.2030272,
+                            TRUE ~ Long)) %>% 
+    select(-id)
+```
+
+
+# Species names fixes  
+
+```{r}
+dat_all <- dat_all %>% 
+    mutate(Species = case_when(Species == "Salicornia biglovii" ~ "Salicornia bigelovii",
+                               Species == "Juniperus virginicus" ~ "Juniperus virginiana",
+                               Species == "Fimbristylus spadicea" ~ "Fimbristylis spadicea",
+                               TRUE ~ Species))
+```
 
 
 
