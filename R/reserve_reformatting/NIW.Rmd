@@ -359,11 +359,63 @@ dens_sub <- dat_cdmo %>%
     mutate(Subplot = case_when(is.na(Subplot) ~ 1,
                                TRUE ~ Subplot),
            Species = paste(Species, Subplot, sep = "_"))
+
+
+ht_sub <- dat_cdmo %>% 
+    filter(!is.na(`Maximum Canopy Height`)) %>% 
+    select(Reserve:Species, `Maximum Canopy Height`, QAQC) 
+
+qaqc_to_join <- dat_cdmo %>% 
+    filter(is.na(Subplot)) %>% 
+    select(Reserve:Species, QAQC) %>% 
+    pivot_wider(names_from = Species, values_from = QAQC, names_prefix = "F_")
+```
+
+Pivot to wide  
+
+
+```{r}
 dens_wide <- dens_sub %>% 
     select(-QAQC, -Subplot) %>% 
     pivot_wider(names_from = Species, values_from = Density)
+
+ht_wide <- ht_sub %>% 
+    select(-QAQC, -Subplot) %>% 
+    pivot_wider(names_from = Species, values_from = `Maximum Canopy Height`)
+
+covr_wide <- dat_cdmo %>% 
+    filter(is.na(Subplot)) %>% 
+    select(-Subplot, -c(Density:QAQC)) %>% 
+    pivot_wider(names_from = Species, values_from = Cover)
 ```
 
-Pivot cover to wide  
+Need to average whatever values are present for density, then make it wide again, then join to cover and height. Need to add 'density' or 'maximum canopy height' as prefixes.  Actually don't need the acrobatics until future work, when data might be entered into the density sheet. Here, can just work with dens_sub.  
 
+```{r}
+dens_means <- dat_cdmo %>% 
+    filter(!is.na(Density)) %>% 
+    select(Reserve:Species, Density) %>% 
+    group_by(Reserve, Type, Date, SiteID, TransectID, PlotID, Species) %>% 
+    summarize(Density = mean(Density, na.rm = TRUE))
+    
+dens_to_join <- dens_means %>% 
+    pivot_wider(names_from = Species, values_from = Density, names_prefix = "Density_")
+
+ht_to_join <- ht_sub %>% 
+    select(-QAQC, -Subplot) %>% 
+    pivot_wider(names_from = Species, values_from = `Maximum Canopy Height`,
+                names_prefix = "Maximum Canopy Height_")
+```
+
+
+Join:  
+
+```{r}
+covr_sheet_out <- covr_wide %>% 
+    full_join(dens_to_join) %>% 
+    full_join(ht_to_join) %>% 
+    full_join(qaqc_to_join)
+
+write_xlsx(covr_sheet_out, path = here::here("wrangled_data", "NMST", "NIW_NMSTish.xlsx"))
+```
 
