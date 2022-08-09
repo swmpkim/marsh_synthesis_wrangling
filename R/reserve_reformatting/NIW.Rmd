@@ -211,7 +211,7 @@ dat_all <- dat_all %>%
 ```
 
 
-# Species names fixes  
+## Species names fixes  
 
 ```{r}
 dat_all <- dat_all %>% 
@@ -221,7 +221,17 @@ dat_all <- dat_all %>%
                                TRUE ~ Species))
 ```
 
+## Subplot fix  
 
+For Segment A, Transect 3, Plot 4, unvegetated, there's a 'subplot' ID of 3 but only cover (not density or height) is provided - more consistent with 'NA' for subplot. Changing here.  
+
+```{r}
+dat_all <- dat_all %>% 
+    mutate(long_id = paste(SiteID, TransectID, PlotID, Species, sep = "-"),
+           Subplot = case_when(long_id == "Segment A-3-4-unvegetated" ~ NA_real_,
+                               TRUE ~ Subplot)) %>% 
+    select(-long_id)
+```
 
 
 ## CDMO format (long)  
@@ -323,3 +333,37 @@ stns_all <- dat_cdmo %>%
 
 nrow(stns_all) == nrow(station_table)
 ```
+
+
+# NIW to Namaste-ish  
+
+Need to pull out subplots for density and height.  
+
+The following isn't really working. From the metadata, subplots are only done for density, and only high-density species. So what I really need to do is, pull out all the density data, and pivot that separately from everything else......
+
+```{r}
+covr_plots <- dat_cdmo %>% 
+    filter(is.na(Subplot))
+# should have values for cover; NAs for density and height
+summary(covr_plots[c("Cover", "Density", "Maximum Canopy Height", "Average Canopy Height")])
+
+sub_plots <- dat_cdmo %>% 
+    filter(!is.na(Subplot))
+summary(sub_plots[c("Cover", "Density", "Maximum Canopy Height", "Average Canopy Height")])
+```
+
+```{r}
+dens_sub <- dat_cdmo %>% 
+    filter(!is.na(Density)) %>% 
+    select(Reserve:Species, Density, QAQC) %>% 
+    mutate(Subplot = case_when(is.na(Subplot) ~ 1,
+                               TRUE ~ Subplot),
+           Species = paste(Species, Subplot, sep = "_"))
+dens_wide <- dens_sub %>% 
+    select(-QAQC, -Subplot) %>% 
+    pivot_wider(names_from = Species, values_from = Density)
+```
+
+Pivot cover to wide  
+
+
