@@ -260,10 +260,10 @@ Subset from covr_sheet to ensure equal number of rows between sheets
 ```{r}
 hts_sheet <- covr_sheet %>% 
     select(all_of(id_names), Notes,
-           starts_with("Average Canopy Height_"))
+           starts_with("Maximum Canopy Height_"))
 
 # get the 'Density' prefix out of the names
-names(hts_sheet) <- str_replace(names(hts_sheet), "^(Average Canopy Height_)", "")
+names(hts_sheet) <- str_replace(names(hts_sheet), "^(Maximum Canopy Height_)", "")
 ```
 
 
