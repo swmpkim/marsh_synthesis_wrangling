@@ -25,6 +25,8 @@ library(writexl)
 library(leaflet)
 library(rgdal)
 library(stringi)  # for stri_sub_replace()
+
+reserve <- "DEL-SJR"
 ```
 
 # Setup  
@@ -44,8 +46,9 @@ Update for each reserve: all start at  `here::here("submitted_data", "data")` bu
 Also create an output folder for each reserve in the `wrangled data` folder and update the `path_out` below.  
 
 ```{r}
-path_start <- here::here("submitted_data", "data")
-path_out <- here::here("wrangled_data")
+path_start <- here::here("submitted_data", "data", "DEL", "Veg Data and Metadata")
+problem_path_out <- here::here("wrangled_data", "combined_with_issues")
+path_out <- here::here("wrangled_data", "CDMO")
 
 # create the output folder if it doesn't already exist
 if(!dir.exists(path_out)){
@@ -69,7 +72,7 @@ files_all <- dir(path_start)
 # str_which(files_all, "APAVEG\\d{4}\\.xlsx")
 # \\d for digit; {4} for 'exactly 4 times'; \\. for . only (otherwise it's a class)
 # stack overflow regex tutorial: https://stackoverflow.com/questions/4736/learning-regular-expressions
-files_matching <- str_which(files_all, "APAVEG\\d{4}\\.xlsx")
+files_matching <- str_which(files_all, "DEL Veg Monitoring Raw Data.xlsx")
 
 to_read <- files_all[files_matching]
 ```
@@ -79,6 +82,11 @@ Read into a list and combine  **MODIFY FOR DIFFERENT DATA TYPES**
 # CDMO formatted input  
 
 This section will compile code to read in and combine files that are already in CDMO format. Then a long CDMO-format file will be generated, after reconciling column names, dates, and putting things in order. The NaMaSTe template file will be generated from the CDMO-format file.  
+
+SJR is either "Sheet1" (2012 and 2014) or "SJR".  
+BCR is only in 2016 and 2018; sheet is "BCR".  
+
+Defaults got all of SJR.  
 
 ```{r}
 dat_in <- list()
@@ -106,6 +114,8 @@ names(dat_all)
 
 Include subplot if used by reserve. Want an empty tibble below.    
 
+Running both for SJR because they indicate subplot 1 when density readings are taken, but there don't seem to be multiple subplots or other duplication.  
+
 ```{r}
 # subplot included
 dat_all %>% 
@@ -115,15 +125,22 @@ dat_all %>%
     select(Date:Species, n)
 
 # # no subplot included
-# dat_all %>% 
-#    group_by(Date, SiteID, TransectID, PlotID,  Species) %>% 
-#     tally() %>% 
-#     filter(n > 1) %>% 
-#     select(Date:Species, n)
+dat_all %>%
+   group_by(Date, SiteID, TransectID, PlotID,  Species) %>%
+    tally() %>%
+    filter(n > 1) %>%
+    select(Date:Species, n)
 ```
 
 
 ## Check station/plot names  
+
+No Reserve column at first! Add in.  
+
+```{r}
+dat_all$Reserve <- "DEL-SJR"
+```
+
 
 ```{r}
 unique(dat_all$Reserve)
@@ -166,9 +183,12 @@ sum(str_detect(spp_all, "Rhizo"))
 
 ```
 
-Also check for anything other than 'E' in 'Type'.
+Also check for anything other than 'E' in 'Type'.  
+
+At SJR, there was no Type column, so I add it here.  
 
 ```{r}
+dat_all$Type <- "E"
 unique(dat_all$Type)
 ```
 
@@ -198,6 +218,11 @@ dat_all <- dat_all %>%
 CDMO column names, in order. If columns had different names, or there were additional ones, account for that here.    
 
 ```{r}
+dat_all$`SSAM-1` <- "Y"
+dat_all$`Orthometric Height` <- NA
+dat_all$`Height Relative to MLLW` <- NA
+dat_all$QAQC <- NA
+
 dat_cdmo <- dat_all %>% 
     select(
         "Reserve",
@@ -215,10 +240,9 @@ dat_cdmo <- dat_all %>%
         "Orthometric Height",
         "Height Relative to MLLW",
         "Species",
-        "Cover",
+        "Cover" = "% Cover",
         "Density",
-        "Maximum Canopy Height",
-        "Average Canopy Height",
+        "Maximum Canopy Height" = "Canopy Height",
         "Diameter",
         "Height",
         "QAQC"
@@ -229,7 +253,7 @@ dat_cdmo <- dat_all %>%
 ## Write the CDMO data frame to a file. **Modify for each reserve**  
 
 ```{r}
-write_xlsx(dat_cdmo, path = here::here(path_out, "Reserve_CDMO.xlsx"),
+write_xlsx(dat_cdmo, path = here::here(path_out, "DEL-SJR_CDMO.xlsx"),
            format_headers = TRUE)
 ```
 

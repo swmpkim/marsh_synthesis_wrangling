@@ -48,12 +48,13 @@ In a Shiny app, let someone pick this interactively. Here, hard-code. Using MAR 
 # reserve <- "CBM-JB"  # Maximum Canopy Height
 # reserve <- "GND"  # completed 6/17/12
 # reserve <- "KAC"  # completed 6/17/22
-# reserve <- "LKS"  # waiting on Lemna dupe issue
+# reserve <- "LKS"  # Lemna dupe issue fixed; completed 6/28/22
 # reserve <- "MAR"  # completed 6/17/22
 # reserve <- "NOC-MI"  # completed 6/17/22
 # reserve <- "NOC-RC"  # completed 6/17/22
 # reserve <- "NOC-ZI"  # completed 6/17/22
-reserve <- "GTM"  # completed 6/21/22
+# reserve <- "GTM"  # completed 6/21/22  # re-done 7/6/22 with higher 'skip-max' because orthometric height read in wrong
+reserve <- "DEL-SJR"
 ```
 
 ```{r}
@@ -76,8 +77,12 @@ Read in data and rename:
 
 ```{r}
 dat <- read_xlsx(path,
-                 guess_max = 2500) %>% 
-    rename(any_of(col_matching))
+                 guess_max = 5000) %>% 
+    rename(any_of(col_matching)) %>% 
+    mutate(Date = lubridate::mdy(Date),
+           Year = lubridate::year(Date),
+           Month = lubridate::month(Date),
+           Day = lubridate::mday(Date))
 ```
 
 Add required columns if they don't exist. QAQC, SSAM-1, OrthoHt, HtMLLW.
@@ -175,11 +180,11 @@ dens <- dat %>%
 
 ```{r}
 hts <- dat %>% 
-    select(all_of(id_names), Species, Height = "Canopy Height") %>% 
+    select(all_of(id_names), Species, Height = "Maximum Canopy Height") %>% 
     filter(!is.na(Height)) %>% 
     pivot_wider(names_from = Species,
                 values_from = Height,
-                names_prefix = "Average Canopy Height_")
+                names_prefix = "Maximum Canopy Height_")
 ```
 
 
