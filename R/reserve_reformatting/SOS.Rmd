@@ -243,7 +243,7 @@ dens_ht <- read_xlsx(here::here(path_start, "SOS_StemCt_Ht_2010_2021.xlsx"),
                      sheet = "Stem_counts_and_heights")
 abbrevs <- read_xlsx(here::here(path_start, "SOS_StemCt_Ht_2010_2021.xlsx"),
                      sheet = "Plant Acronyms")
-names(abbrevs) <- c("code", "full")
+names(abbrevs) <- c("code", "Species")
 ```
 
 Issues to fix:  
@@ -257,9 +257,59 @@ dens_ht <- dens_ht %>%
            Date_mdy = case_when(str_detect(Date, "/") ~ Date,
                                 TRUE ~ NA_character_),
            Date = case_when(!is.na(Date_excel) ~ janitor::excel_numeric_to_date(Date_excel),
-                            !is.na(Date_mdy) ~ lubridate::mdy(Date_mdy))) %>% 
+                            !is.na(Date_mdy) ~ lubridate::mdy(Date_mdy)),
+           across(c(`AGRSTO ct`:`OENSAR ht3`), as.numeric),
+           TransectID = as.character(TransectID),
+           PlotID = as.character(PlotID)) %>% 
+    rename(SiteID = Site) %>% 
     select(-Date_excel, -Date_mdy)
 ```
+
+## Split out density and height  
+
+```{r}
+all_names <- names(dens_ht)
+dens_names <- all_names[str_ends(all_names, pattern = " ct")]
+ht_names <- all_names[str_ends(all_names, pattern = " ht[1-3]")]
+
+dens <- dens_ht %>% 
+    select(ID:Year, "Notes" = NOTES, all_of(dens_names)) %>% 
+    pivot_longer(-(ID:Notes), 
+                 names_to = c("code", "param"), 
+                 names_sep = " ",
+                 values_to = "Density") %>% 
+    filter(!is.na(Density)) %>% 
+    full_join(abbrevs) %>% 
+    select(-code, -param) %>% 
+    relocate(Species, .before = Density)
+    
+hts <- dens_ht %>% 
+    select(ID:Year, "Notes" = NOTES, all_of(ht_names))%>% 
+    pivot_longer(-(ID:Notes), 
+                 names_to = c("code", "param"), 
+                 names_sep = " ",
+                 values_to = "Height") %>% 
+    filter(!is.na(Height)) %>%
+    group_by(SiteID, TransectID, PlotID, Year, Date, code) %>% 
+    summarize(Height = mean(Height)) %>% 
+    full_join(abbrevs) %>% 
+    select(-code) %>% 
+    relocate(Species, .before = Height)
+```
+
+
+## Add density and height to CDMO-formatted data frame  
+
+```{r}
+dat_all_ALL <- dat_all %>% 
+    full_join(hts) %>% 
+    full_join(dens)
+```
+
+
+# IMPORTANT NOTES FOR THIS RESERVE  
+
+Will average heights to get into CDMO format. Will insert density where it belongs. WHEN MAKING THE NAMASTE TEMPLATE, need to come back to this to get the REPLICATES OF HEIGHT DATA.  
 
 
 # Fix discrepancies  
