@@ -1,0 +1,371 @@
+---
+title: "South Slough"
+author: "Kim Cressman"
+date: "2022-08-16; latest update `r Sys.Date()`"
+output: 
+    html_document:
+        toc: true
+        toc_depth: 2
+        code_folding: hide
+---
+
+Use this template to set up the wrangling for an individual reserve's files.  
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      warning = FALSE,
+                      message = FALSE)
+```
+
+```{r}
+library(tidyverse)
+library(readxl)
+library(writexl)
+library(leaflet)
+library(rgdal)
+library(stringi)  # for stri_sub_replace()
+
+reserve <- "SOS"
+```
+
+# Setup  
+
+## Helpful functions  
+
+Because I'll be doing this repetitively on similar data files....  
+
+```{r}
+source(here::here("R", "sourced", "00_helper_functions.R"))
+```
+
+## Data path  
+
+Update for each reserve: all start at  `here::here("submitted_data", "data")` but it varies by reserve.   
+
+Also create an output folder for each reserve in the `wrangled data` folder and update the `path_out` below.  
+
+```{r}
+path_start <- here::here("submitted_data", "data", reserve)
+problem_path_out <- here::here("wrangled_data", "combined_with_issues")
+path_out <- here::here("wrangled_data", "CDMO")
+
+# create the output folder if it doesn't already exist
+if(!dir.exists(path_out)){
+    dir.create(path_out)
+}
+```
+
+**South Slough only has 2 main files, but lots of worksheets.**  
+
++  `SOS_PercCov_2010_2021.xlsx` - format of sheets is SOSyyyy: SOS2011, SOS2015, etc. Formatted in CDMO style.  
++  `SOS_StemCt_Ht_2010_2021.xlsx` - wide format, with counts and heights (multiple columns for height). Also has worksheet to decode plant acronyms. 
+
+Define the worksheets   
+
+```{r}
+book <- here::here(path_start, "SOS_PercCov_2010_2021.xlsx") 
+sheets <- excel_sheets(book)
+```
+
+
+
+Read into a list and combine  **MODIFY FOR DIFFERENT DATA TYPES**  
+
+# CDMO formatted input  
+
+This section will compile code to read in and combine files that are already in CDMO format. Then a long CDMO-format file will be generated, after reconciling column names, dates, and putting things in order. The NaMaSTe template file will be generated from the CDMO-format file.  
+
+```{r}
+dat_in <- list()
+
+for(i in seq_along(sheets)){
+    dat_in[[i]] <- read_cdmo(here::here(book),
+                             worksheet = sheets[i],
+                             skip = 3) %>% 
+        mutate(PlotID = as.character(PlotID),
+               TransectID = as.character(TransectID))
+}
+
+# find out if any columns aren't the same type
+janitor::compare_df_cols_same(dat_in)
+
+dat_all <- bind_rows(dat_in)
+```
+
+```{r}
+dat_all %>% 
+    filter(PlotID == "x") %>% 
+    View()
+
+dat_all %>% 
+    filter(TransectID %in% c("M", "S")) %>% 
+    View()
+```
+
+PlotID and TransectID had to be formatted as character. PlotID has a value of `x` in Transect4 at site FS, only in one instance in 2019; TransectID has `M` and `S` in 2010 only at site DM.  
+
+```{r}
+dat_all %>% 
+    filter(SiteID == "FS",
+           TransectID == 4) %>% 
+    View()
+```
+
+
+I suspect `x` is plot 3, because distance from beginning of transect is given as 24 in the datasheet, and plot 3 was 25 in the time period before that (and plot 4 is 35). But the cells are highlighted in the data sheet, so someone thought something was strange.  
+
+
+```{r}
+dat_all %>% 
+    filter(SiteID == "DM") %>% 
+    select(Date:PlotID) %>% 
+    distinct() %>% 
+    View()
+```
+
+
+# Checks  
+
+## Column names and types?  
+
+Look for different column names for the same thing.  
+
+```{r}
+names(dat_all)
+```
+
+## Duplicates in date-site-transect-plot-species  
+
+Include subplot if used by reserve. Want an empty tibble below.    
+
+```{r}
+unique(dat_all$Subplot)
+
+# subplot included
+# dat_all %>% 
+#    group_by(Date, SiteID, TransectID, PlotID, Subplot, Species) %>% 
+#     tally() %>% 
+#     filter(n > 1) %>% 
+#     select(Date:Species, n)
+
+# # no subplot included
+dat_all %>%
+   group_by(Date, SiteID, TransectID, PlotID,  Species) %>%
+    tally() %>%
+    filter(n > 1) %>%
+    select(Date:Species, n) %>% 
+    View()
+
+spp_dupes <- dat_all %>%
+   group_by(Date, SiteID, TransectID, PlotID,  Species) %>%
+    tally() %>%
+    filter(n > 1) %>%
+    select(Date:Species, n)
+# write.csv(spp_dupes,
+#           here::here("wrangled_data", "combined_with_issues", "SOS_dupes.csv"),
+#           row.names = FALSE)
+```
+
+
+## Check station/plot names  
+
+```{r}
+unique(dat_all$Reserve)
+```
+
+```{r}
+dat_all %>% 
+    select(Reserve, SiteID, TransectID, PlotID) %>% 
+    distinct() %>% 
+    knitr::kable()
+```
+
+
+### 'Distance' discrepancies  
+
+```{r}
+stn_dupes <- dat_all %>% 
+    select(Reserve, SiteID, TransectID, PlotID,
+           Distance) %>% 
+    distinct() %>% 
+    janitor::get_dupes(-Distance)
+
+stn_dupes
+```
+
+Different distances for plots - must measure every time.  
+
+### Lat/Long discrepancies  
+
+
+
+## Mangroves or SAV present?  
+
+Mangrove species are: *Avicennia germinans*, *Laguncularia racemosa*, *Rhizophora mangle*. Check for these before discarding a `Height` or `Diameter` column.   
+
+The following sums will be 0 if none of the genus names were found in the species column. This is only set to detect the first few letteres in case of misspellings, so if any sums are above 0, it deserves further investigation.  
+
+```{r}
+spp_all <- sort(unique(dat_all$Species))
+knitr::kable(spp_all)
+sum(str_detect(spp_all, "Avic"))
+sum(str_detect(spp_all, "Lagunc"))
+sum(str_detect(spp_all, "Rhizo"))
+
+```
+
+Also check for anything other than 'E' in 'Type'.
+
+```{r}
+unique(dat_all$Type)
+```
+
+## Check species names  
+
+```{r}
+dat_all$Species <- str_replace(dat_all$Species, pattern = "  ", replacement = " ")
+    
+spp <- dat_all %>% 
+    group_by(Species) %>% 
+    tally()
+
+spp_out_path <- here::here("wrangled_data", "combined_with_issues", paste0(reserve, "_species.csv")) 
+
+write.csv(spp, spp_out_path, row.names = FALSE)
+```
+
+
+# Bring in density and heights workbook  
+
+```{r}
+dens_ht <- read_xlsx(here::here(path_start, "SOS_StemCt_Ht_2010_2021.xlsx"),
+                     sheet = "Stem_counts_and_heights")
+abbrevs <- read_xlsx(here::here(path_start, "SOS_StemCt_Ht_2010_2021.xlsx"),
+                     sheet = "Plant Acronyms")
+names(abbrevs) <- c("code", "full")
+```
+
+Issues to fix:  
+
++  Date is sometimes mm/dd/yyyy and other times Excel's date format. Split these out and unify.  
+
+```{r}
+dens_ht <- dens_ht %>% 
+    mutate(Date_excel = as.numeric(case_when(!str_detect(Date, "/") ~ Date,
+                                             TRUE ~ NA_character_)),
+           Date_mdy = case_when(str_detect(Date, "/") ~ Date,
+                                TRUE ~ NA_character_),
+           Date = case_when(!is.na(Date_excel) ~ janitor::excel_numeric_to_date(Date_excel),
+                            !is.na(Date_mdy) ~ lubridate::mdy(Date_mdy))) %>% 
+    select(-Date_excel, -Date_mdy)
+```
+
+
+# Fix discrepancies  
+
+
+## Column wrangling  
+
+Pull out columns for Month, Day, and Year; and format Date as mm/dd/yyyy for the CDMO output file.  
+
+```{r}
+dat_all <- dat_all %>% 
+    mutate(
+        Year = lubridate::year(Date),
+        Month = lubridate::month(Date),
+        Day = lubridate::mday(Date),
+        Date = format(Date, "%m/%d/%Y")
+    ) 
+```
+
+
+
+## CDMO format (long)  
+
+CDMO column names, in order. If columns had different names, or there were additional ones, account for that here.    
+
+```{r}
+dat_cdmo <- dat_all %>% 
+    select(
+        "Reserve",
+        "Type",
+        "Date",
+        "Year",
+        "Month",
+        "Day",
+        "SiteID",
+        "TransectID",
+        "PlotID",
+        "Subplot",
+        "Rep",
+        "SSAM-1",
+        "Lat",
+        "Long",
+        "Distance",
+        "Orthometric Height",
+        "Height Relative to MLLW",
+        "Species",
+        "Cover",
+        "Density",
+        "Maximum Canopy Height",
+        "Average Canopy Height",
+        "Diameter",
+        "Height",
+        "QAQC"
+    )
+```
+
+
+## Write the CDMO data frame to a file. **Modify for each reserve**  
+
+```{r}
+write.csv(dat_cdmo, here::here(problem_path_out, paste0(reserve, "_issues.csv")), 
+          row.names= FALSE,
+          na = "")
+```
+
+```{r}
+write_xlsx(dat_cdmo, path = here::here(path_out, paste0(reserve, "_CDMO.xlsx")),
+           format_headers = TRUE)
+```
+
+
+# NaMaSTe tables  
+
+Get rid of any NAs in lat/long; we want station characteristics.  
+
+```{r}
+station_table <- dat_cdmo %>% 
+    select(Reserve,
+           SiteID,
+           TransectID,
+           PlotID,
+           Lat,
+           Long,
+           Type,
+           "SSAM-1") %>% 
+    filter(!is.na(Lat),
+           !is.na(Long)) %>% 
+    distinct()
+```
+
+Do any plots have multiple rows?  
+
+```{r}
+station_table %>% 
+    group_by(Reserve, SiteID, TransectID, PlotID) %>% 
+    tally() %>% 
+    arrange(desc(n)) %>% 
+    knitr::kable()
+```
+
+Are all stations actually represented? If the below output is FALSE, there's a problem to fix. If TRUE, proceed.     
+
+```{r}
+stns_all <- dat_cdmo %>% 
+    select(Reserve, SiteID, TransectID, PlotID) %>% 
+    distinct()
+
+nrow(stns_all) == nrow(station_table)
+```
