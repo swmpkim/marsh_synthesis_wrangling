@@ -65,12 +65,14 @@ read_cdmo <- function(file,
                         n_max = 10,
                         na = NAs,
                         sheet = worksheet)
-    
-    # which column has "Lat" in it? This should be numeric.
-    lat <- str_which(names(to_mod), "Lat")
-    lat_vec <- to_mod[[lat]]
+
     
     if(is.null(skip)){
+        
+        # which column has "Lat" in it? This should be numeric.
+        lat <- str_which(names(to_mod), "Lat")
+        lat_vec <- to_mod[[lat]]
+        
         skip <- skip_fun(lat_vec)  
     }
     
