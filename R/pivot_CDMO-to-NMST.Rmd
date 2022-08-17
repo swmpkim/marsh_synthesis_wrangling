@@ -46,7 +46,7 @@ In a Shiny app, let someone pick this interactively. Here, hard-code. Using MAR 
 ```{r}
 # reserve <- "APA"  # contains Average and Maximum Canopy Height
 # reserve <- "CBM-JB"  # Maximum Canopy Height
-# reserve <- "GND"  # completed 6/17/12
+reserve <- "GND"  # completed 6/17/12
 # reserve <- "KAC"  # completed 6/17/22
 # reserve <- "LKS"  # Lemna dupe issue fixed; completed 6/28/22
 # reserve <- "MAR"  # completed 6/17/22
@@ -54,7 +54,7 @@ In a Shiny app, let someone pick this interactively. Here, hard-code. Using MAR 
 # reserve <- "NOC-RC"  # completed 6/17/22
 # reserve <- "NOC-ZI"  # completed 6/17/22
 # reserve <- "GTM"  # completed 6/21/22  # re-done 7/6/22 with higher 'skip-max' because orthometric height read in wrong
-reserve <- "DEL-SJR"
+# reserve <- "DEL-SJR"
 ```
 
 ```{r}
@@ -70,7 +70,14 @@ Renaming possibilities:
 
 ```{r}
 col_matching <- c("Orthometric_Height" = "Orthometric Height",
-                  "Height_Relative_to_MLLW" = "Height Relative to MLLW")
+                  "Height_Relative_to_MLLW" = "Height Relative to MLLW",
+                  "Ht" = "Canopy Height",
+                  "Ht" = "Average Canopy Height",
+                  "Ht" = "Maximum Canopy Height")
+
+# deal with different types of canopy height measurement
+res_info <- read_xlsx(here::here("Reserve_Info.xlsx"))
+ht_type <- unlist(res_info[res_info$Reserve == reserve, "Height_CDMO"])
 ```
 
 Read in data and rename:  
@@ -180,11 +187,11 @@ dens <- dat %>%
 
 ```{r}
 hts <- dat %>% 
-    select(all_of(id_names), Species, Height = "Maximum Canopy Height") %>% 
-    filter(!is.na(Height)) %>% 
+    select(all_of(id_names), Species, Ht) %>% 
+    filter(!is.na(Ht)) %>% 
     pivot_wider(names_from = Species,
-                values_from = Height,
-                names_prefix = "Maximum Canopy Height_")
+                values_from = Ht,
+                names_prefix = paste0(ht_type, "_"))
 ```
 
 
