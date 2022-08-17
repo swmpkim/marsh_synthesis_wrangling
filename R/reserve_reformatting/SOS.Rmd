@@ -249,8 +249,65 @@ dat_all <- left_join(dat_all, spp_correct) %>%
     relocate(Species, .before = Cover)
 ```
 
+
+# Get rid of exactly duplicated rows  
+
+this gets rid of 191 rows  
+
+```{r}
+dat_all <- dat_all %>% 
+    distinct()
+
+# check for dupes again
+dat_all %>%
+   group_by(Date, SiteID, TransectID, PlotID,  Species) %>%
+    tally() %>%
+    filter(n > 1) %>%
+    select(Date:Species, n)
+
+# there are a few; these must have non-matching Cover values and need to be investigated
+cover_discreps <- dat_all %>% 
+    janitor::get_dupes(-Cover) %>% 
+    select(Date, SiteID, TransectID, PlotID,  Species, Cover)
+
+# write.csv(cover_discreps,
+#           here::here("wrangled_data", "combined_with_issues", 
+#                      "SOS_dupes_discrepancies.csv"),
+#           row.names = FALSE)
+```
+
+
+
 # Bring in lat/long  
 
+Lat, long, and elevations are measured on a different timeline than veg data - for at least one site (FS), cover measurements were taken in July and elevation/lat/long measurements in September of a couple different years. Not sure whether I should tie these together then.....  
+
+```{r}
+coords <- read_xlsx(here::here(path_start,  
+                               "SOS_Elevations_2010_2021.xlsx")) %>% 
+    select(SiteID = Site,
+           TransectID,
+           PlotID,
+           Date = Date_Obs,
+           Lat = LocalLatit,
+           Long = LocalLongi,
+           Orthometric_Height = `Elevation (m; NAVD88)`) %>% 
+    mutate(Reserve = "SOS",
+           Date_excel = as.numeric(case_when(!str_detect(Date, "/") ~ Date,
+                                             TRUE ~ NA_character_)),
+           Date_mdy = case_when(str_detect(Date, "/") ~ Date,
+                                TRUE ~ NA_character_),
+           Date = case_when(!is.na(Date_excel) ~ janitor::excel_numeric_to_date(Date_excel),
+                            !is.na(Date_mdy) ~ lubridate::mdy(Date_mdy))) %>% 
+    select(-Date_excel, -Date_mdy)
+
+# dat_all2 <- full_join(dat_all, coords) %>% 
+#     relocate(Lat, .after = "SSAM-1") %>% 
+#     relocate(Long, .after = Lat)
+# 
+# dat_all2 %>% arrange(Date) %>% View()
+
+```
 
 
 # Bring in density and heights workbook  
@@ -318,7 +375,7 @@ hts <- dens_ht %>%
 ## Add density and height to CDMO-formatted data frame  
 
 ```{r}
-dat_all_ALL <- dat_all %>% 
+dat_all <- dat_all %>% 
     full_join(hts) %>% 
     full_join(dens)
 ```
@@ -353,6 +410,17 @@ dat_all <- dat_all %>%
 CDMO column names, in order. If columns had different names, or there were additional ones, account for that here.    
 
 ```{r}
+# add in missing columns
+dat_all <- dat_all %>% 
+    mutate(Subplot = NA,
+           Rep = NA,
+           Lat = NA,
+           Long = NA,
+           "Orthometric Height" = NA,
+           "Height Relative to MLLW" = NA,
+           QAQC = NA)
+
+
 dat_cdmo <- dat_all %>% 
     select(
         "Reserve",
@@ -375,10 +443,7 @@ dat_cdmo <- dat_all %>%
         "Species",
         "Cover",
         "Density",
-        "Maximum Canopy Height",
-        "Average Canopy Height",
-        "Diameter",
-        "Height",
+        "Maximum Canopy Height" = Height,
         "QAQC"
     )
 ```
@@ -412,8 +477,6 @@ station_table <- dat_cdmo %>%
            Long,
            Type,
            "SSAM-1") %>% 
-    filter(!is.na(Lat),
-           !is.na(Long)) %>% 
     distinct()
 ```
 
@@ -424,6 +487,7 @@ station_table %>%
     group_by(Reserve, SiteID, TransectID, PlotID) %>% 
     tally() %>% 
     arrange(desc(n)) %>% 
+    head() %>% 
     knitr::kable()
 ```
 
