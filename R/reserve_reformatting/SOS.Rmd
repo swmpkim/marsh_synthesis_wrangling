@@ -232,8 +232,25 @@ spp <- dat_all %>%
 
 spp_out_path <- here::here("wrangled_data", "combined_with_issues", paste0(reserve, "_species.csv")) 
 
-write.csv(spp, spp_out_path, row.names = FALSE)
+# write.csv(spp, spp_out_path, row.names = FALSE)
 ```
+
+# Fix species names  
+
+I copied the csv written out just above, and inserted a new column "Species_correct" into which I copied all of the original species, and updated misspelled ones to the correct spellings. Can do a full join and rename of this to get all species corrected in the data frame.  
+
+```{r}
+spp_correct <- read.csv(here::here("wrangled_data", "combined_with_issues", "SOS_species_corrected.csv")) %>% 
+    select(-n)
+
+dat_all <- left_join(dat_all, spp_correct) %>% 
+    select(-Species) %>% 
+    rename(Species = Species_correct) %>% 
+    relocate(Species, .before = Cover)
+```
+
+# Bring in lat/long  
+
 
 
 # Bring in density and heights workbook  
