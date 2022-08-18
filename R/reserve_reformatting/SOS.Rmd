@@ -93,36 +93,7 @@ janitor::compare_df_cols_same(dat_in)
 dat_all <- bind_rows(dat_in)
 ```
 
-```{r}
-dat_all %>% 
-    filter(PlotID == "x") %>% 
-    View()
-
-dat_all %>% 
-    filter(TransectID %in% c("M", "S")) %>% 
-    View()
-```
-
-PlotID and TransectID had to be formatted as character. PlotID has a value of `x` in Transect4 at site FS, only in one instance in 2019; TransectID has `M` and `S` in 2010 only at site DM.  
-
-```{r}
-dat_all %>% 
-    filter(SiteID == "FS",
-           TransectID == 4) %>% 
-    View()
-```
-
-
-I suspect `x` is plot 3, because distance from beginning of transect is given as 24 in the datasheet, and plot 3 was 25 in the time period before that (and plot 4 is 35). But the cells are highlighted in the data sheet, so someone thought something was strange.  
-
-
-```{r}
-dat_all %>% 
-    filter(SiteID == "DM") %>% 
-    select(Date:PlotID) %>% 
-    distinct() %>% 
-    View()
-```
+PlotID and TransectID had to be formatted as character. PlotID had a value of `x` in Transect4 at site FS, only in one instance in 2019 in original file; this has been fixed in a re-submitted file. TransectID has `M` and `S` in 2010 only at site DM; these are real transects that were only measured that year.  
 
 
 # Checks  
@@ -265,10 +236,10 @@ dat_all %>%
     filter(n > 1) %>%
     select(Date:Species, n)
 
-# there are a few; these must have non-matching Cover values and need to be investigated
 cover_discreps <- dat_all %>% 
     janitor::get_dupes(-Cover) %>% 
     select(Date, SiteID, TransectID, PlotID,  Species, Cover)
+# all good now
 
 # write.csv(cover_discreps,
 #           here::here("wrangled_data", "combined_with_issues", 
