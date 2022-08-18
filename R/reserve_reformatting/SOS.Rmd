@@ -347,8 +347,8 @@ hts <- dens_ht %>%
 
 ```{r}
 dat_all <- dat_all %>% 
-    full_join(hts) %>% 
-    full_join(dens)
+    full_join(hts, by = c("SiteID", "TransectID", "PlotID", "Species", "Date")) %>% 
+    full_join(dens, by = c("SiteID", "TransectID", "PlotID", "Species", "Date"))
 ```
 
 
