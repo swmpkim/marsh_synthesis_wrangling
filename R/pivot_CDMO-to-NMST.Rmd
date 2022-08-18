@@ -181,7 +181,8 @@ dens <- dat %>%
     filter(!is.na(Density)) %>% 
     pivot_wider(names_from = Species,
                 values_from = Density,
-                names_prefix = "Density_")
+                names_prefix = "Density_",
+                names_sort = TRUE)
 ```
 
 
@@ -193,7 +194,8 @@ hts <- dat %>%
     filter(!is.na(Ht)) %>% 
     pivot_wider(names_from = Species,
                 values_from = Ht,
-                names_prefix = paste0(ht_type, "_"))
+                names_prefix = paste0(ht_type, "_"),
+                names_sort = TRUE)
 ```
 
 
@@ -286,10 +288,11 @@ Everything in this table is the first recorded value.
 
 stns <- dat %>% 
     select(Reserve, SiteID, TransectID, PlotID) %>% 
-    distinct()
+    distinct() %>% 
+    arrange(SiteID, TransectID, PlotID)
 lats <- establ(dat, Lat)
 longs <- establ(dat, Long)
-ssam1 <- establ(dat, "SSAM-1")
+ssam1 <- establ(dat, `SSAM-1`)
 dists <- establ(dat, Distance)
 orth_hts <- establ(dat, Orthometric_Height) 
 mllw_hts <- establ(dat, Height_Relative_to_MLLW)
