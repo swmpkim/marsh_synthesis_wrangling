@@ -87,8 +87,10 @@ This assumes there are year, month, and day columns in the CDMO-formatted files.
 
 ```{r}
 dat <- read_xlsx(path,
-                 guess_max = 5000) %>% 
+                 guess_max = 5000,
+                 na = c("", "NA", "N/A", "na")) %>% 
     rename(any_of(col_matching)) %>% 
+    filter(!is.na(Year)) %>% 
     mutate(Date = lubridate::ymd(paste(Year, Month, Day, sep = "-")))
 ```
 
