@@ -46,7 +46,7 @@ In a Shiny app, let someone pick this interactively. Here, hard-code. Using MAR 
 ```{r}
 # reserve <- "APA"  # contains Average and Maximum Canopy Height
 # reserve <- "CBM-JB"  # Maximum Canopy Height
-# reserve <- "GND"  # completed 6/17/12
+reserve <- "GND"  # completed 6/17/12
 # reserve <- "KAC"  # completed 6/17/22
 # reserve <- "LKS"  # Lemna dupe issue fixed; completed 6/28/22
 # reserve <- "MAR"  # completed 6/17/22
@@ -55,7 +55,7 @@ In a Shiny app, let someone pick this interactively. Here, hard-code. Using MAR 
 # reserve <- "NOC-ZI"  # completed 6/17/22
 # reserve <- "GTM"  # completed 6/21/22  # re-done 7/6/22 with higher 'skip-max' because orthometric height read in wrong
 # reserve <- "DEL-SJR"
-reserve <- "SOS"
+# reserve <- "SOS"
 ```
 
 ```{r}
@@ -315,7 +315,7 @@ stn_tbl <- full_join(stns, lats) %>%
 
 ```{r}
 spp_names <- dat %>% 
-    select(Species, Type) %>% 
+    select(Species) %>% 
     distinct() %>% 
     arrange(Species)
 ```
