@@ -83,14 +83,13 @@ ht_type <- unlist(res_info[res_info$Reserve == reserve, "Height_CDMO"])
 
 Read in data and rename:  
 
+This assumes there are year, month, and day columns in the CDMO-formatted files. SO PUT THEM THERE, SELF.  
+
 ```{r}
 dat <- read_xlsx(path,
                  guess_max = 5000) %>% 
     rename(any_of(col_matching)) %>% 
-    mutate(Date = lubridate::mdy(Date),
-           Year = lubridate::year(Date),
-           Month = lubridate::month(Date),
-           Day = lubridate::mday(Date))
+    mutate(Date = lubridate::ymd(paste(Year, Month, Day, sep = "-")))
 ```
 
 Add required columns if they don't exist. QAQC, SSAM-1, OrthoHt, HtMLLW.
