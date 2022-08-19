@@ -82,9 +82,10 @@ dat_in <- list()
 for(i in seq_along(sheets_all)){
     dat_in[[i]] <- read_cdmo(path_start,
                              worksheet = sheets_all[i]) %>% 
-        mutate("Canopy Height" = case_when("Canopy Height" == "NN" ~ NA_character_,
-                                           TRUE ~ "Canopy Height"),
-               "Canopy Height" = as.numeric("Canopy Height"),
+        mutate("Canopy Height" = as.character(`Canopy Height`),
+               "Canopy Height" = case_when("Canopy Height" == "NN" ~ NA_character_,
+                                           TRUE ~ `Canopy Height`),
+               "Canopy Height" = as.numeric(`Canopy Height`),
                Density = as.numeric(Density))
 }
 
@@ -308,6 +309,9 @@ dat_cdmo <- dat_all %>%
         "Reserve",
         "Type",
         "Date",
+        "Year",
+        "Month",
+        "Day",
         "SiteID",
         "TransectID",
         "PlotID",
