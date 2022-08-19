@@ -45,16 +45,16 @@ In a Shiny app, let someone pick this interactively. Here, hard-code. Using MAR 
 
 ```{r}
 # reserve <- "APA"  # contains Average and Maximum Canopy Height
-# reserve <- "CBM-JB"  # Maximum Canopy Height
-reserve <- "GND"  # completed 6/17/12
-# reserve <- "KAC"  # completed 6/17/22
-# reserve <- "LKS"  # Lemna dupe issue fixed; completed 6/28/22
+# reserve <- "CBM-JB"  # updated 8/19/22
+# reserve <- "GND"  # updated 8/19/22
+# reserve <- "KAC"  # updated 8/19/22
+# reserve <- "LKS"  # updated 8/19/22
 # reserve <- "MAR"  # completed 6/17/22
 # reserve <- "NOC-MI"  # completed 6/17/22
 # reserve <- "NOC-RC"  # completed 6/17/22
 # reserve <- "NOC-ZI"  # completed 6/17/22
 # reserve <- "GTM"  # completed 6/21/22  # re-done 7/6/22 with higher 'skip-max' because orthometric height read in wrong
-# reserve <- "DEL-SJR"
+reserve <- "DEL-SJR" # updated 8/19/22
 # reserve <- "SOS"
 ```
 
@@ -272,10 +272,11 @@ Subset from covr_sheet to ensure equal number of rows between sheets
 ```{r}
 hts_sheet <- covr_sheet %>% 
     select(all_of(id_names), Notes,
-           starts_with("Maximum Canopy Height_"))
+           starts_with(as.character(ht_type)))
 
-# get the 'Density' prefix out of the names
-names(hts_sheet) <- str_replace(names(hts_sheet), "^(Maximum Canopy Height_)", "")
+# get the 'Height' prefix out of the names
+# will start with either Maximum or Average Canopy Height
+names(hts_sheet) <- str_replace(names(hts_sheet), "^([MAa-z]+ Canopy Height_)", "")
 ```
 
 
