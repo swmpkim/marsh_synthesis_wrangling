@@ -1,0 +1,385 @@
+---
+title: "SOS to NMST"
+author: "Kim Cressman"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      warning = FALSE,
+                      message = FALSE)
+```
+
+# Import data  
+
+```{r}
+library(tidyverse)
+library(readxl)
+library(writexl)
+library(leaflet)
+library(rgdal)
+library(stringi)  # for stri_sub_replace()
+
+
+# function to pick first non-NA reading for any given plot ("at establishment")
+establ <- function(df, x){
+    
+    x_vec <- df %>% 
+        select({{x}})
+    
+    if(sum(!is.na(x_vec)) == 0){
+        out <- df %>% 
+            select(SiteID, TransectID, PlotID, {{x}}) %>% 
+            distinct() 
+    } else {
+        out <- df %>% 
+            select(Date, SiteID, TransectID, PlotID, {{x}}) %>% 
+            distinct() %>% 
+            group_by(SiteID, TransectID, PlotID) %>% 
+            filter(!is.na({{x}})) %>%
+            filter(Date == min(Date)) %>% 
+            select(-Date)
+    }
+        
+    out
+}
+
+
+
+reserve <- "SOS"
+```
+
+```{r}
+# path <- here::here("wrangled_data", "CDMO", "res_CDMO.xlsx")
+path <- here::here("wrangled_data", "CDMO", paste0(reserve, "_CDMO.xlsx"))
+
+# out_path <- here::here("wrangled_data", "NMST", "res_NMST.xlsx")
+out_path <- here::here("wrangled_data", "NMST", paste0(reserve, "_NMST.xlsx"))
+```
+
+Renaming possibilities:  
+
+```{r}
+col_matching <- c("Orthometric_Height" = "Orthometric Height",
+                  "Height_Relative_to_MLLW" = "Height Relative to MLLW",
+                  "Ht" = "Canopy Height",
+                  "Ht" = "Average Canopy Height",
+                  "Ht" = "Maximum Canopy Height")
+
+# deal with different types of canopy height measurement
+res_info <- read_xlsx(here::here("Reserve_Info.xlsx"))
+ht_type <- unlist(res_info[res_info$Reserve == reserve, "Height_CDMO"])
+```
+
+```{r}
+dat <- read_xlsx(path,
+                 guess_max = 5000,
+                 na = c("", "NA", "N/A", "na")) %>% 
+    rename(any_of(col_matching)) %>% 
+    filter(!is.na(Year)) %>% 
+    mutate(Date = lubridate::ymd(paste(Year, Month, Day, sep = "-")))
+```
+
+Add required columns if they don't exist. QAQC, SSAM-1, OrthoHt, HtMLLW.
+
+```{r}
+if(!exists("QAQC", dat)){
+  dat$QAQC <- NA  
+}
+
+if(!exists("SSAM-1", dat)){
+  dat$`SSAM-1` <- NA  
+}
+
+if(!exists("Orthometric_Height", dat)){
+  dat$Orthometric_Height <- NA  
+}
+
+if(!exists("Height_Relative_to_MLLW", dat)){
+  dat$Height_Relative_to_MLLW <- NA  
+}
+```
+
+
+## Identifiers  
+
+Should be the same between all sheets  
+
+```{r}
+id_names <- c("Reserve", "SiteID", 
+             "Year", "Month", "Day",
+             "TransectID", "PlotID",
+             "Orthometric_Height", "Height_Relative_to_MLLW",
+             "Distance")
+
+# only use ID columns that exist in the data frame
+id_names <- id_names[which(id_names %in% names(dat))]
+```
+
+## Deal with notes separately  
+
+If there's not a Notes column, make one full of NAs.  
+
+```{r}
+if(exists("Notes", dat)){
+    notes <- dat %>% 
+        filter(!is.na(Notes))
+    c_notes <- notes %>% 
+        group_by(SiteID, Year, Month, Day, TransectID, PlotID) %>% 
+        summarize(Notes = str_c(unique(Notes), collapse = "; "))
+} else {
+    c_notes <- dat %>% 
+        group_by(SiteID, Year, Month, Day, TransectID, PlotID) %>% 
+        summarize(Notes = NA_character_)
+}
+```
+
+# Cover sheet  
+
+NOTE this sheet also has average canopy height and density. Replicates are on the other sheets.  
+
+**For SOS, still using code from `pivot_CDMO-to-NMST.Rmd` for this sheet** - will re-import full density and height data for the density and height sheets.  
+
+## Cover data  
+
+```{r}
+covr <- dat %>% 
+    select(all_of(id_names), Species, Cover, QAQC)
+
+# make sure there aren't any dupes  
+janitor::get_dupes(covr, -Cover)
+```
+
+```{r}
+# pivot
+covr_wide <- covr %>% 
+    rename("F" = QAQC) %>% 
+    pivot_wider(names_from = Species,
+                values_from = c(Cover, "F"),
+                names_sort = TRUE)
+
+# get the 'Cover' prefix out of the names
+names(covr_wide) <- str_replace(names(covr_wide), "^(Cover_)", "")
+```
+
+
+## Density data  
+
+```{r}
+dens <- dat %>% 
+    select(all_of(id_names), Species, Density) %>% 
+    filter(!is.na(Density)) %>% 
+    pivot_wider(names_from = Species,
+                values_from = Density,
+                names_prefix = "Density_",
+                names_sort = TRUE)
+```
+
+
+## Height data  
+
+```{r}
+hts <- dat %>% 
+    select(all_of(id_names), Species, Ht) %>% 
+    filter(!is.na(Ht)) %>% 
+    pivot_wider(names_from = Species,
+                values_from = Ht,
+                names_prefix = paste0(ht_type, "_"),
+                names_sort = TRUE)
+```
+
+
+## Mangrove height and diameter  
+
+if applicable.  
+
+```{r}
+spp_all <- sort(unique(dat$Species))
+
+# are mangroves present in the species list
+mangroves <- sum(str_detect(spp_all, "Avic")) + sum(str_detect(spp_all, "Lagunc")) + sum(str_detect(spp_all, "Rhizo"))
+
+# what are those species
+mang_spp <- spp_all[str_which(spp_all, "Avic")]
+
+if(mangroves > 0){
+    dat_mang_ht <- dat %>% 
+        filter(Species %in% mang_spp) %>% 
+        select(all_of(id_names), Species, Height) %>% 
+        pivot_wider(names_from = Species,
+                values_from = Height,  # Height in original dataset is mangrove height
+                names_prefix = "Height_")
+    
+    dat_mang_diam <- dat %>% 
+        filter(Species %in% mang_spp) %>% 
+        select(all_of(id_names), Species, Diameter) %>% 
+        pivot_wider(names_from = Species,
+                values_from = Diameter,  # Height in original dataset is mangrove height
+                names_prefix = "Diameter_")
+    
+    dat_mang <- full_join(dat_mang_ht, dat_mang_diam)
+}
+```
+
+
+## Join them all  
+
+```{r}
+covr_sheet <- full_join(covr_wide, dens) %>% 
+    full_join(hts) %>% 
+    full_join(c_notes) %>% 
+    select(all_of(id_names), Notes, everything()) %>% 
+    relocate(Notes, .after = Distance) %>% 
+    relocate(starts_with("F_"), .after = last_col())
+
+# join in mangrove heights and diameters too
+if(mangroves > 0){
+    covr_sheet <- full_join(covr_sheet, dat_mang) %>% 
+        relocate(starts_with("F_"), .after = last_col())
+}
+```
+
+
+# Density and Height Sheets  
+
+## Bring in density and heights workbook  
+
+```{r}
+path_start <- here::here("submitted_data", "data", reserve)
+dens_ht <- read_xlsx(here::here(path_start, "SOS_StemCt_Ht_2010_2021.xlsx"),
+                     sheet = "Stem_counts_and_heights")
+abbrevs <- read_xlsx(here::here(path_start, "SOS_StemCt_Ht_2010_2021.xlsx"),
+                     sheet = "Plant Acronyms")
+names(abbrevs) <- c("code", "Species")
+```
+
+Issues to fix:  
+
++  Date is sometimes mm/dd/yyyy and other times Excel's date format. Split these out and unify.  
+
+```{r}
+dens_ht <- dens_ht %>% 
+    mutate(Date_excel = as.numeric(case_when(!str_detect(Date, "/") ~ Date,
+                                             TRUE ~ NA_character_)),
+           Date_mdy = case_when(str_detect(Date, "/") ~ Date,
+                                TRUE ~ NA_character_),
+           Date = case_when(!is.na(Date_excel) ~ janitor::excel_numeric_to_date(Date_excel),
+                            !is.na(Date_mdy) ~ lubridate::mdy(Date_mdy)),
+           across(c(`AGRSTO ct`:`OENSAR ht3`), as.numeric),
+           TransectID = as.character(TransectID),
+           PlotID = as.character(PlotID)) %>% 
+    rename(SiteID = Site) %>% 
+    select(-Date_excel, -Date_mdy)
+```
+
+## Split out density and height  
+
+Pivoted longer to replace codes with names, then pivot back wider. Probably don't need to do it this way but the pivot_longer code is already written from generating the averages for the cover sheet.  
+
+```{r}
+all_names <- names(dens_ht)
+dens_names <- all_names[str_ends(all_names, pattern = " ct")]
+ht_names <- all_names[str_ends(all_names, pattern = " ht[1-3]")]
+
+dens <- dens_ht %>% 
+    select(ID:Year, "Notes" = NOTES, all_of(dens_names)) %>% 
+    pivot_longer(-(ID:Notes), 
+                 names_to = c("code", "param"), 
+                 names_sep = " ",
+                 values_to = "Density") %>% 
+    filter(!is.na(Density)) %>% 
+    full_join(abbrevs) %>% 
+    select(-code, -param) %>% 
+    relocate(Species, .before = Density)
+    
+hts <- dens_ht %>% 
+    select(ID:Year, "Notes" = NOTES, all_of(ht_names))%>% 
+    pivot_longer(-(ID:Notes), 
+                 names_to = c("code", "rep"), 
+                 names_sep = " ht",
+                 values_to = "Height") %>% 
+    filter(!is.na(Height)) %>%
+    full_join(abbrevs) %>% 
+    select(-code) %>% 
+    relocate(Species, .before = Height) %>%
+    mutate(Species = paste(Species, rep)) %>% 
+    select(-rep)
+```
+
+## Pivot  
+
+```{r}
+dens_sheet <- dens %>% 
+    pivot_wider(names_from = Species,
+                values_from = Density,
+                names_sort = TRUE)
+
+hts_sheet <- hts %>% 
+    pivot_wider(names_from = Species,
+                values_from = Height,
+                names_sort = TRUE)
+```
+
+
+
+# Other sheets  
+
+Back to code from `pivot_CDMO-to-NMST.Rmd`  
+
+# Station Table  
+
+Everything in this table is the first recorded value.  
+
+
+```{r}
+# there must be a better way to do this, but it works.
+
+stns <- dat %>% 
+    select(Reserve, SiteID, TransectID, PlotID) %>% 
+    distinct() %>% 
+    arrange(SiteID, TransectID, PlotID)
+lats <- establ(dat, Lat)
+longs <- establ(dat, Long)
+ssam1 <- establ(dat, `SSAM-1`)
+dists <- establ(dat, Distance)
+orth_hts <- establ(dat, Orthometric_Height) 
+mllw_hts <- establ(dat, Height_Relative_to_MLLW)
+types <- establ(dat, Type)
+
+stn_tbl <- full_join(stns, lats) %>% 
+    full_join(longs) %>% 
+    full_join(types) %>% 
+    full_join(orth_hts) %>% 
+    full_join(mllw_hts) %>%
+    full_join(dists) %>% 
+    full_join(ssam1)
+
+```
+
+
+
+# Species List  
+
+```{r}
+spp_names <- dat %>% 
+    select(Species) %>% 
+    distinct() %>% 
+    arrange(Species)
+```
+
+
+
+
+# Write to Excel  
+
+```{r}
+write_xlsx(list(Station_Table = stn_tbl,
+                Species_Names = spp_names,
+                Cover = covr_sheet,
+                Density = dens_sheet,
+                Height = hts_sheet),
+           path = out_path,
+           format_headers = TRUE)
+```
+
