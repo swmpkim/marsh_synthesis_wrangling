@@ -33,6 +33,29 @@ Because I'll be doing this repetitively on similar data files....
 
 ```{r}
 source(here::here("R", "sourced", "00_helper_functions.R"))
+
+# function to pick first non-NA reading for any given plot ("at establishment")
+establ <- function(df, x){
+    
+    x_vec <- df %>% 
+        select({{x}})
+    
+    if(sum(!is.na(x_vec)) == 0){
+        out <- df %>% 
+            select(SiteID, TransectID, PlotID, {{x}}) %>% 
+            distinct() 
+    } else {
+        out <- df %>% 
+            select(Date, SiteID, TransectID, PlotID, {{x}}) %>% 
+            distinct() %>% 
+            group_by(SiteID, TransectID, PlotID) %>% 
+            filter(!is.na({{x}})) %>%
+            filter(Date == min(Date)) %>% 
+            select(-Date)
+    }
+        
+    out
+}
 ```
 
 ## Data path  
@@ -42,9 +65,11 @@ Update for each reserve: all start at  `here::here("submitted_data", "data")` bu
 Also create an output folder for each reserve in the `wrangled data` folder and update the `path_out` below.  
 
 ```{r}
+reserve <- "NIW"
 path_start <- here::here("submitted_data", "data", "NIW")
 problem_path_out <- here::here("wrangled_data", "combined_with_issues")
 path_out <- here::here("wrangled_data", "CDMO")
+out_path <- here::here("wrangled_data", "NMST", paste0(reserve, "_NMST.xlsx"))
 ```
 
 
@@ -358,7 +383,7 @@ dens_sub <- dat_cdmo %>%
     select(Reserve:Species, Density, QAQC) %>% 
     mutate(Subplot = case_when(is.na(Subplot) ~ 1,
                                TRUE ~ Subplot),
-           Species = paste(Species, Subplot, sep = "_"))
+           Species = paste(Species, Subplot, sep = " "))
 
 
 ht_sub <- dat_cdmo %>% 
@@ -431,6 +456,79 @@ covr_sheet_out <- covr_wide %>%
     full_join(qaqc_to_join) %>% 
     select(-`NA`, -Subplot, -F_NA)
 
-write_xlsx(covr_sheet_out, path = here::here("wrangled_data", "NMST", "NIW_NMSTish.xlsx"))
+# write_xlsx(covr_sheet_out, path = here::here("wrangled_data", "NMST", "NIW_NMSTish.xlsx"))
 ```
 
+
+# Other sheets  
+
+Density and Height sheets can be built from `dens_wide` and `ht_wide` but I'm worried rows won't 100% match the cover sheet.  
+
+```{r}
+dens_sheet <- dens_wide
+hts_sheet <- ht_wide
+```
+
+
+
+Back to code from `pivot_CDMO-to-NMST.Rmd`  
+
+# Station Table  
+
+Everything in this table is the first recorded value.  
+
+
+```{r}
+dat <- dat_cdmo %>% 
+    rename(Orthometric_Height = `Orthometric Height`,
+           Height_Relative_to_MLLW = `Height Relative to MLLW`)
+# there must be a better way to do this, but it works.
+
+stns <- dat %>% 
+    select(Reserve, SiteID, TransectID, PlotID) %>% 
+    distinct() %>% 
+    arrange(SiteID, TransectID, PlotID)
+lats <- establ(dat, Lat)
+longs <- establ(dat, Long)
+ssam1 <- establ(dat, `SSAM-1`)
+dists <- establ(dat, Distance)
+orth_hts <- establ(dat, Orthometric_Height) 
+mllw_hts <- establ(dat, Height_Relative_to_MLLW)
+types <- establ(dat, Type)
+
+stn_tbl <- full_join(stns, lats) %>% 
+    full_join(longs) %>% 
+    full_join(types) %>% 
+    full_join(orth_hts) %>% 
+    full_join(mllw_hts) %>%
+    full_join(dists) %>% 
+    full_join(ssam1)
+
+```
+
+
+
+# Species List  
+
+```{r}
+spp_names <- dat %>% 
+    select(Species) %>% 
+    distinct() %>% 
+    filter(!is.na(Species)) %>% 
+    arrange(Species)
+```
+
+
+
+
+# Write to Excel  
+
+```{r}
+write_xlsx(list(Station_Table = stn_tbl,
+                Species_Names = spp_names,
+                Cover = covr_sheet_out,
+                Density = dens_sheet,
+                Height = hts_sheet),
+           path = out_path,
+           format_headers = TRUE)
+```
