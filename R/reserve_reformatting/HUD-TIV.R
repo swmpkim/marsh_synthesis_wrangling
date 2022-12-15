@@ -63,15 +63,25 @@ if(janitor::compare_df_cols_same(excels_in)){
 
 # bind data frames from csv and excel together
 if(janitor::compare_df_cols_same(csvs, excels)){
-    hud_tiv <- bind_rows(csvs, excels)
+    hud_tiv <- bind_rows(csvs, excels) %>% 
+        rename("northing" = "Lat",
+               "easting" = "Long") %>% 
+        mutate(across(c(northing,
+                        easting,
+                        Distance,
+                        Elevation,
+                        Cover,
+                        Density,
+                        Ht), as.numeric)
+               )
     message("csv and excel data frames bound successfully")
 } else {warning("CSV AND EXCEL DATA FRAMES WILL NOT BIND")}
 
 
 # Copied from before - UTM to decimal degrees
-## Also need to correct OTN-3B northing
+## need to correct OTN-3B northing
 hud_tiv <- hud_tiv %>% 
-    mutate(northing = case_when(PlotID == "OTN-3B" ~ 4654284,
+    mutate(northing = case_when(PlotID == "OTN-3B" & northing < 3000000 ~ 4654284,
                                 TRUE ~ northing))
 
 points <- hud_tiv %>% 
@@ -87,4 +97,5 @@ hud_tiv <- hud_tiv %>%
            Reserve = "HUD",
            SiteID = "TIV") %>% 
     separate(PlotID, into = c("TransectID", "PlotID"), sep = "-") %>% 
-    select(Reserve, SiteID, TransectID, PlotID, Lat, Long, northing, easting)
+    select(Reserve, SiteID, TransectID, PlotID, Lat, Long, 
+           northing, easting, everything())
