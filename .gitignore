@@ -1,0 +1,11 @@
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+
+data/
+submitted_data/
+wrangled_data/
+Reserve_Info.xlsx
+*.Rproj
+
