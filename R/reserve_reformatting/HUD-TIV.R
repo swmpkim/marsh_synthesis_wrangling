@@ -99,3 +99,7 @@ hud_tiv <- hud_tiv %>%
     separate(PlotID, into = c("TransectID", "PlotID"), sep = "-") %>% 
     select(Reserve, SiteID, TransectID, PlotID, Lat, Long, 
            northing, easting, everything())
+
+# clean up
+rm(csvs, csvs_in, excels, excels_in, lnlt, points,
+   spgeo, sputm, tmp, col_matching, csvss, xlsxs)
