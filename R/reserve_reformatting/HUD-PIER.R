@@ -69,12 +69,49 @@ hud_pier3 <- hud_pier2 %>%
            Long = lnlt$easting)
 
 hud_pier <- left_join(hud_pier, hud_pier3) %>% 
-    mutate(Reserve = "HUD",
-           SiteID = "PIER") %>% 
-    select(Reserve, SiteID, PlotID, Lat, Long, 
+    mutate(Reserve = "HUD-PIER") %>% 
+    select(Reserve, PlotID, Lat, Long, 
            northing, easting, everything())
 
 # clean up
 rm(excels_in, xlsxs, lnlt, points,
    spgeo, sputm, tmp, col_matching, 
    hud_pier2, hud_pier3)
+
+
+
+############### CHECKS ##########################
+dat_all <- hud_pier
+# Column names and types
+names(dat_all)
+
+# Duplicates in date-site-transect-plot-species
+# we want to see an empty table
+# # no subplot included
+dupes <- dat_all %>%
+    select(Date, PlotID,  Species, Cover, Density, Ht) %>% 
+    janitor::get_dupes(-c(Cover, Density, Ht))
+# write.csv(dupes, here::here("wrangled_data", "combined_with_issues", "HUD-PIER_dupes.csv"),
+#           row.names = FALSE)
+
+# Station/plot names
+unique(dat_all$Reserve)
+dat_all %>% 
+    select(Reserve, PlotID) %>% 
+    distinct() %>% 
+    knitr::kable()
+
+
+
+# Check for mangroves/SAV - looking for something other than 'E' in 'Type'
+unique(dat_all$`Plot Type`)
+
+
+# Check species names
+dat_all$Species <- str_replace(dat_all$Species, pattern = "  ", replacement = " ")
+spp <- dat_all %>% 
+    group_by(Species) %>% 
+    tally()
+spp_out_path <- here::here("wrangled_data", "combined_with_issues", "HUD-PIER_species.csv") 
+write.csv(spp, spp_out_path, row.names = FALSE)
+# looks good

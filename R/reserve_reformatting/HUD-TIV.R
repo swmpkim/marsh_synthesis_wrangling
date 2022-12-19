@@ -50,7 +50,8 @@ for(i in seq_along(xlsxs)){
         filter(row_number() != 1) %>% 
         rename(any_of(col_matching))
     names(tmp)[2] <- "Date"
-
+    tmp <- fill(tmp, Date, .direction = "up")
+    
     excels_in[[i]] <- tmp
 }
 
@@ -67,12 +68,13 @@ if(janitor::compare_df_cols_same(csvs, excels)){
         rename("northing" = "Lat",
                "easting" = "Long") %>% 
         mutate(across(c(northing,
-                        easting,
-                        Distance,
-                        Elevation,
-                        Cover,
-                        Density,
-                        Ht), as.numeric)
+                        easting
+                        # Distance,
+                        # Elevation
+                        # Cover,
+                        # Density,
+                        # Ht
+                        ), as.numeric)
                )
     message("csv and excel data frames bound successfully")
 } else {warning("CSV AND EXCEL DATA FRAMES WILL NOT BIND")}
@@ -94,12 +96,66 @@ lnlt <- data.frame(coordinates(spgeo))
 hud_tiv <- hud_tiv %>% 
     mutate(Lat = lnlt$northing,
            Long = lnlt$easting,
-           Reserve = "HUD",
-           SiteID = "TIV") %>% 
-    separate(PlotID, into = c("TransectID", "PlotID"), sep = "-") %>% 
-    select(Reserve, SiteID, TransectID, PlotID, Lat, Long, 
+           Reserve = "HUD-TIV") %>% 
+    rename(TransectID = Transect.ID) %>% 
+    select(Reserve, SiteID, PlotID, Lat, Long, 
            northing, easting, everything())
 
 # clean up
 rm(csvs, csvs_in, excels, excels_in, lnlt, points,
    spgeo, sputm, tmp, col_matching, csvss, xlsxs)
+
+
+############### CHECKS ##########################
+dat_all <- hud_tiv
+# Column names and types
+names(dat_all)
+
+# Duplicates in date-site-transect-plot-species
+# we want to see an empty table
+unique(dat_all$Subplot)
+
+# subplot included
+# dat_all %>% 
+#     group_by(Date, SiteID, TransectID, PlotID, Subplot, Species) %>% 
+#     tally() %>% 
+#     filter(n > 1) %>% 
+#     select(Date:Species, n)
+
+# # no subplot included
+dupes <- dat_all %>%
+    select(Date, SiteID, TransectID, PlotID,  Species, Cover, Density, Ht) %>% 
+    janitor::get_dupes(-c(Cover, Density, Ht))
+write.csv(dupes, here::here("wrangled_data", "combined_with_issues", "HUD-TIV_dupes.csv"),
+          row.names = FALSE)
+
+# Station/plot names
+unique(dat_all$Reserve)
+dat_all %>% 
+    select(Reserve, SiteID, TransectID, PlotID) %>% 
+    distinct() %>% 
+    knitr::kable()
+# some issues because of TransectID being labelled vs. NA
+
+
+# Distance discrepancies
+stn_dupes <- dat_all %>% 
+    select(Reserve, SiteID, TransectID, PlotID,
+           Distance) %>% 
+    distinct() %>% 
+    janitor::get_dupes(-Distance)
+stn_dupes
+
+
+# Check for mangroves/SAV - looking for something other than 'E' in 'Type'
+unique(dat_all$Type)
+
+
+# Check species names
+dat_all$Species <- str_replace(dat_all$Species, pattern = "  ", replacement = " ")
+spp <- dat_all %>% 
+    group_by(Species) %>% 
+    tally()
+spp_out_path <- here::here("wrangled_data", "combined_with_issues", "HUD-TIV_species.csv") 
+write.csv(spp, spp_out_path, row.names = FALSE)
+# looks good
