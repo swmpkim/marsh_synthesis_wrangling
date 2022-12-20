@@ -40,6 +40,10 @@ for(i in seq_along(xlsxs)){
     excels_in[[i]] <- tmp
 }
 
+# get rid of 2019 data and blank rows from 2020 sheet before combining
+excels_in[[2]] <- excels_in[[2]] %>% 
+    filter(Date >= "2020-01-01")
+
 if(janitor::compare_df_cols_same(excels_in)){
     hud_pier <- bind_rows(excels_in) %>% 
         mutate(Date = lubridate::ymd(Date),
