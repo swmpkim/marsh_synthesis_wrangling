@@ -179,7 +179,8 @@ dat_cdmo <- dat_all %>%
         "Diameter",
         "Height",
         "QAQC"
-    )
+    ) %>% 
+    filter(!is.na(Species))
 
 write_xlsx(dat_cdmo, 
            path = here::here("wrangled_data", "CDMO", "HUD-PIER_CDMO.xlsx"),

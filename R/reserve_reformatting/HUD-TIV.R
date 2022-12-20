@@ -1,6 +1,7 @@
 library(tidyverse)
 library(readxl)
 library(rgdal)
+library(writexl)
 
 # Set up path, file names, and column names  
 path_tiv <- here::here("submitted_data", "data", 
@@ -129,6 +130,10 @@ dupes <- dat_all %>%
 write.csv(dupes, here::here("wrangled_data", "combined_with_issues", "HUD-TIV_dupes.csv"),
           row.names = FALSE)
 
+# get rid of the 9 exact dupes
+dat_all <- dat_all %>% 
+    distinct(Date, SiteID, PlotID, Species, .keep_all = TRUE)
+
 # Station/plot names
 unique(dat_all$Reserve)
 dat_all %>% 
@@ -159,3 +164,53 @@ spp <- dat_all %>%
 spp_out_path <- here::here("wrangled_data", "combined_with_issues", "HUD-TIV_species.csv") 
 write.csv(spp, spp_out_path, row.names = FALSE)
 # looks good
+
+
+################ CDMO FORMATTING ######################
+dat_all <- dat_all %>% 
+    mutate(
+        Year = lubridate::year(Date),
+        Month = lubridate::month(Date),
+        Day = lubridate::mday(Date),
+        Date = format(Date, "%m/%d/%Y")
+    ) 
+
+dat_all$`SSAM-1` <- "Y"
+dat_all$`Height Relative to MLLW` <- NA
+dat_all$QAQC <- NA
+dat_all$Diameter <- NA
+dat_all$Height <- NA
+
+dat_cdmo <- dat_all %>% 
+    select(
+        "Reserve",
+        "Type",
+        "Date",
+        "Year",
+        "Month",
+        "Day",
+        "SiteID",
+        "TransectID",
+        "PlotID",
+        "Subplot",
+        "Rep",
+        "SSAM-1",
+        "Lat",
+        "Long",
+        "Distance",
+        "Orthometric Height" = "Elevation",
+        "Height Relative to MLLW",
+        "Species",
+        "Cover",
+        "Density",
+        "Ht",
+        "Diameter",
+        "Height",
+        "QAQC"
+    )
+
+write_xlsx(dat_cdmo, 
+           path = here::here("wrangled_data", "CDMO", "HUD-TIV_CDMO.xlsx"),
+           format_headers = TRUE)
+
+##### NAMASTE TABLES #######

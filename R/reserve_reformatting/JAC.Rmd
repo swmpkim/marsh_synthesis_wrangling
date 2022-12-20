@@ -45,7 +45,8 @@ Also create an output folder for each reserve in the `wrangled data` folder and 
 
 ```{r}
 path_start <- here::here("submitted_data", "data", "JAC")
-path_out <- here::here("wrangled_data", "JAC")
+problem_path_out <- here::here("wrangled_data", "combined_with_issues")
+path_out <- here::here("wrangled_data", "CDMO")
 
 # create the output folder if it doesn't already exist
 if(!dir.exists(path_out)){
@@ -81,12 +82,23 @@ Read into a list and combine  **MODIFY FOR DIFFERENT DATA TYPES**
 
 This section will compile code to read in and combine files that are already in CDMO format. Then a long CDMO-format file will be generated, after reconciling column names, dates, and putting things in order. The NaMaSTe template file will be generated from the CDMO-format file.  
 
+Only want 'Density...17', because it's been converted to per m^2. True in all input files.  
+
+2011 file has 2 columns for canopy height - first is in cm; 2nd is in m. Other files are only in m, so only want to keep the 2nd.  
+
 ```{r}
 dat_in <- list()
 
 for(i in seq_along(to_read)){
     
     dat_in_tmp <- read_cdmo(to_read[i]) 
+    
+    # 2 canopy height columns in 2011
+    if(years[i] == "2011"){
+        dat_in_tmp <- dat_in_tmp %>% 
+            select(-"Canopy Height...18") %>% 
+            rename("Canopy Height" = "Canopy Height...19")
+    } 
     
     # different column title in 2013
     if(years[i] == "2013"){
@@ -100,6 +112,11 @@ for(i in seq_along(to_read)){
         dat_in_tmp$TransectID <- as.numeric(dat_in_tmp$TransectID)
     }
     
+    # all have 2 density columns and we only want the 2nd
+    dat_in_tmp <- dat_in_tmp %>% 
+        select(-"Density...16") %>% 
+        rename(Density = "Density...17")
+    
     dat_in[[i]] <- dat_in_tmp
 }
 
@@ -107,6 +124,13 @@ for(i in seq_along(to_read)){
 dat_all <- bind_rows(dat_in)
 ```
 
+Deal with extra columns - should be Notes. Extra_2 is just NAs, only need Extra_1.  
+
+```{r}
+dat_all <- dat_all %>% 
+    select(-Extra_2) %>% 
+    rename(Notes = Extra_1)
+```
 
 
 # Checks  
@@ -125,19 +149,23 @@ Include subplot if used by reserve. Want an empty tibble below.
 
 ```{r}
 # # subplot included
-# dat_all %>% 
-#    group_by(Date, SiteID, TransectID, PlotID, Subplot, Species) %>% 
-#     tally() %>% 
-#     filter(n > 1) %>% 
-#     select(Date:Species, n)
-
-# no subplot included
 dat_all %>%
-   group_by(Date, SiteID, TransectID, PlotID,  Species) %>%
+   group_by(Date, SiteID, TransectID, PlotID, Subplot, Species) %>%
     tally() %>%
     filter(n > 1) %>%
-    select(Date:Species, n) %>% 
-    View()
+    select(Date:Species, n)
+
+dupes <- dat_all %>% 
+    mutate(rownum = row_number()) %>% 
+    janitor::get_dupes(Date, SiteID, TransectID, PlotID, Subplot, Species)
+
+# no subplot included
+# dat_all %>%
+#    group_by(Date, SiteID, TransectID, PlotID,  Species) %>%
+#     tally() %>%
+#     filter(n > 1) %>%
+#     select(Date:Species, n) %>% 
+#     View()
 ```
 
 
