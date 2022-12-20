@@ -94,6 +94,17 @@ dupes <- dat_all %>%
 # write.csv(dupes, here::here("wrangled_data", "combined_with_issues", "HUD-PIER_dupes.csv"),
 #           row.names = FALSE)
 
+dupes2 <- dat_all %>%
+    select(Date, PlotID,  Species, Cover, Density, Ht) %>% 
+    mutate(rownum = row_number()) %>% 
+    janitor::get_dupes(-rownum)
+
+# get rid of 2019 data from the 2020 data frame
+dat_all <- dat_all %>% 
+    mutate(rownum = row_number()) %>% 
+    filter(!is.na(PlotID)) %>% 
+    distinct(Date, PlotID, Species, Cover, Density, Ht, .keep_all = TRUE)
+
 # Station/plot names
 unique(dat_all$Reserve)
 dat_all %>% 
