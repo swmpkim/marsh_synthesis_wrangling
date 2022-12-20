@@ -126,7 +126,27 @@ Running both for SJR because they indicate subplot 1 when density readings are t
 ```{r}
 dat_all %>% 
     select(Date, SiteID, TransectID, PlotID,  Species, `% Cover`) %>% 
-    janitor::get_dupes(-`% Cover`)
+    mutate(rownum = row_number()) %>% 
+    janitor::get_dupes(-c(`% Cover`, rownum))
+```
+
+
+BCR Transect G, Plot G4, 2016-08-23, Unvegetative is duplicated. Row 489 has 0 for % Cover; Row 503 has 55. From the data file, it looks like 0 is the mistake; 55 + the other % covers for the plot on that date add up to 100. Will remove row 489.  
+
+```{r}
+## testing code 
+
+# dat2 <- dat_all
+# dat3 <- filter(dat2, row_number() != 489)
+# 
+# dat3 %>% 
+#     select(Date, SiteID, TransectID, PlotID,  Species, `% Cover`) %>% 
+#     mutate(rownum = row_number()) %>% 
+#     janitor::get_dupes(-c(`% Cover`, rownum))
+```
+
+```{r}
+dat_all <- filter(dat_all, row_number() != 489)
 ```
 
 
