@@ -1,7 +1,7 @@
 ---
 title: "CDMO-to-NMST"
 author: "Kim Cressman"
-date: "latest update: 6/17/2022"
+date: "latest update: 12/20/2022"
 output: html_document
 ---
 
@@ -54,7 +54,8 @@ In a Shiny app, let someone pick this interactively. Here, hard-code. Using MAR 
 # reserve <- "NOC-RC"  # completed 6/17/22
 # reserve <- "NOC-ZI"  # completed 6/17/22
 # reserve <- "GTM"  # completed 6/21/22  # re-done 7/6/22 with higher 'skip-max' because orthometric height read in wrong
-reserve <- "DEL-SJR" # updated 8/19/22
+# reserve <- "DEL-SJR" # updated 8/19/22
+reserve <- "DEL-BCR" # completed 12/20/22
 # reserve <- "SOS"
 ```
 
