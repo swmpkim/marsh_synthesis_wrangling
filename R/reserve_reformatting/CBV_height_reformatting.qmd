@@ -1,0 +1,126 @@
+---
+title: "Playing with CBV height data"
+format: html
+---
+
+CBV has some columns where some values are actually two values delimited by a forward slash. I need to separate these columns into two each, based on that slash. Then in a new column, I need to use the lower of the two values (if there are two), or the only value if there weren't two.  
+
+One other issue with these columns is that some of them simply say "f", and.... do I want to discard those? Or keep them? Need to ask Scott L.  
+
+
+```{r}
+library(tidyverse)
+```
+
+
+## Toy data:  
+
+```{r}
+test <- tibble(counter = 1:5,
+               height = c(123, "456/123", "150/110",
+                          "250f", 145))
+
+ht <- test$height
+
+str_split(ht, "/")
+
+test2 <- test %>% 
+    separate(height, into = c("f_ht", "NOTf_ht"), sep = "/",
+             extra = "drop", fill = "right")
+# fill = "right" puts NAs on the right. fill = "left" puts NAs on the left.
+# so if i know one is usually greater than the other, I can fill based on that knowledge.
+
+
+test3 <- test %>% 
+    separate(height, into = c("f_ht", "NOTf_ht"), sep = "/",
+             extra = "drop", fill = "left",
+             remove = FALSE) %>% 
+    mutate(f_ht = ifelse(str_ends(NOTf_ht, "f"), str_remove(NOTf_ht, "f"), f_ht),
+           NOTf_ht = ifelse(str_ends(NOTf_ht, "f"), NA, NOTf_ht),
+           to_average = ifelse(!is.na(NOTf_ht), NOTf_ht, f_ht),
+           across(c(f_ht, NOTf_ht, to_average), as.numeric))
+```
+
+Woot! Now to try that on multiple columns, maybe with some real data from CBV.  
+
+What I did for the 'test3' data frame was:  
+
+-  separate heights with a slash into flowering and not-flowering height columns  
+-  if there wasn't a slash, the value was placed into the not-flowering height column  
+-  if there was an 'f' at the end of the value, that value was put into the flowering height column, and an NA was placed in the not-flowering height column  
+-  a 'to_average' column was generated, using not-flowering height if one was present, and flowering height otherwise  
+-  all the new columns were turned into numeric format  
+
+
+Think I need to make that a function so I can use it on other CBV data.  
+
+```{r}
+fl_cols <- function(df, col){
+    fl_name <- paste0("flowering_", col)
+    nfl_name <- paste0("NOT_flowering_", col)
+    avg_name <- paste0("toAverage_", col)
+    df %>%
+        separate({{col}}, into = c("f_ht", "NOTf_ht"), sep = "/",
+                 extra = "drop", fill = "left",
+                 remove = FALSE) %>% 
+        mutate(f_ht = ifelse(str_ends(NOTf_ht, "f"), str_remove(NOTf_ht, "f"), f_ht),
+               NOTf_ht = ifelse(str_ends(NOTf_ht, "f"), NA, NOTf_ht),
+               to_average = ifelse(!is.na(NOTf_ht), NOTf_ht, f_ht),
+               across(c(f_ht, NOTf_ht, to_average), as.numeric)) %>% 
+        relocate(to_average, .after = NOTf_ht) %>% 
+        rename(!!fl_name := f_ht,
+               !!nfl_name := NOTf_ht,
+               !!avg_name := to_average)
+}
+```
+
+```{r}
+cbv_test <- dat_all %>% 
+    select(Counter, `Unique Code`, Species,
+           `Canopy Height 1`, `Canopy Height 2`, `Canopy Height 3`) %>% 
+    filter(!is.na(`Canopy Height 1`))
+```
+
+
+```{r}
+cbv_hts <- cbv_test %>% 
+    fl_cols("Canopy Height 1") %>% 
+    fl_cols("Canopy Height 2") %>% 
+    fl_cols("Canopy Height 3")
+```
+
+
+
+
+smallest possible test:  
+
+```{r}
+spl <- function(df, col){
+    df %>% 
+        separate({{col}}, sep = "/", 
+                 into = c("new1", "new2"),
+                 extra = "drop", fill = "right",
+                 remove = FALSE)
+}
+
+spl(test, height)
+spl(test, "height")
+```
+
+```{r}
+spl2 <- function(df, col){
+    names_new1 <- paste0(col, "_new1")
+    names_new2 <- paste0(col, "_new2")
+    df %>% 
+        separate({{col}}, sep = "/", 
+                 into = c("new1", "new2"),
+                 extra = "drop", fill = "right",
+                 remove = FALSE) %>% 
+        rename(!!names_new1 := new1,
+               !!names_new2 := new2)
+}
+
+spl2(test, "height")
+cbv_test3 <- spl2(cbv_test, "Canopy Height 1")
+```
+

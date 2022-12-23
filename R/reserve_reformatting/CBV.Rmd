@@ -112,6 +112,9 @@ dat_all %>%
 ```
 
 
+2013-09-17 GI T1 P12 IVAFRU duplicated. Counter rows 33 and 36. One for cover is "1-5" with canopy height as 23.0; other is "26-50" for cover and 230.0 for canopy height.
+
+
 ## Check station/plot names  
 
 ```{r}
