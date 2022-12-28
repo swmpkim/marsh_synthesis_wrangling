@@ -1,0 +1,61 @@
+---
+title: "ACE"
+format: html
+---
+
+```{r}
+library(tidyverse)
+library(readxl)
+reserve <- "ACE"
+```
+
+
+```{r}
+path_start <- here::here("submitted_data", "data", reserve)
+problem_path_out <- here::here("wrangled_data", "combined_with_issues")
+path_out <- here::here("wrangled_data", "CDMO")
+
+# create the output folder if it doesn't already exist
+if(!dir.exists(path_out)){
+    dir.create(path_out)
+}
+```
+
+## Cover  
+
+```{r}
+# dir(path_start)
+# excel_sheets(here::here(path_start, "ACE Basin biomonitoring data_11Aug2021.xlsx"))
+pi_cov <- read_xlsx(here::here(path_start, 
+                               "ACE Basin biomonitoring data_11Aug2021.xlsx"),
+                    sheet = "PerCov_raw")
+
+cov_summ <- pi_cov %>% 
+    group_by(Date, PlotID) %>% 
+    summarize(across(c(Sediment:Mussel, Bare),
+              function(x) sum(x)*2)
+    ) %>% 
+    select(Date, PlotID, SpaAlt, SalVir, JunRoe, Bare, everything())
+```
+
+## Height  
+
+```{r}
+hts <- read_xlsx(here::here(path_start, 
+                               "ACE Basin biomonitoring data_11Aug2021.xlsx"),
+                    sheet = "SpHt_raw")
+
+# ignoring SubQuad to make a new plant num column, then pivot wider
+hts_wide <- hts %>% 
+    group_by(Date, PlotID) %>% 
+    mutate(PlantNum2 = 1:n()) %>%  
+    select(Date, PlotID, PlantNum2, SpaAlt) %>% 
+    pivot_wider(names_from = PlantNum2,
+                names_prefix = "Spartina alterniflora_",
+                values_from = SpaAlt)
+
+# see where all those columns are coming from
+# hts_wide %>% filter(!is.na(`Spartina alterniflora_67`)) %>% View()
+# hts_wide %>% filter(!is.na(`Spartina alterniflora_36`)) %>% View()
+```
+
