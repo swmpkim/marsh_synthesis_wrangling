@@ -1,0 +1,132 @@
+---
+title: "CBM-MB"
+format: html
+---
+
+```{r}
+library(tidyverse)
+library(readxl)
+library(writexl)
+```
+
+```{r}
+# starting path for data
+path_start <- here::here("submitted_data", "data")
+file_in <- here::here(path_start, "CBM", "Veg", "Monie Bay", 
+                      "MASTER MBR_EV_Transect_Data_Current_2017.xlsx")
+
+# excel_sheets(file_in)
+```
+
+from mapping script - to read in file and deal with coordinates  
+
+## Station Table  
+
+Appears to be old typo for MCMST3 P2 and P5. Per Kyle: change P2 from 48.6 to 46.6.  
+
+```{r}
+cbm_prep <- read_xlsx(file_in, sheet = "Site Description",
+                    skip = 9)
+names(cbm_prep)[3:4] <- c("Lat_dms", "Long_dms")
+
+cbm_mb <- read_xlsx(file_in, sheet = "Site Description",
+                     skip = 11,
+                     col_names = FALSE)
+names(cbm_mb) <- names(cbm_prep)
+rm(cbm_prep)
+
+cbm_mb <- cbm_mb %>% 
+    fill(Transect) %>% 
+    mutate(Reserve = "CBM",
+           SiteID = "MB") %>% 
+    select(Reserve, SiteID,
+           TransectID = Transect,
+           PlotID = Plot,
+           Lat_dms, Long_dms,
+           everything())
+
+# convert gps coordinates
+cbm_mb2 <- cbm_mb %>% 
+    mutate(Lat_dms2 = str_replace_all(Lat_dms, "[^[:digit:][\\.]]+", " "),
+           Lat_dms2 = str_trim(Lat_dms2),
+           Long_dms2 = str_replace_all(Long_dms, "[^[:digit:][\\.]]+", " "),
+           Long_dms2 = str_trim(Long_dms2),
+           ID = paste(TransectID, PlotID, sep = "-")) %>% 
+    separate(Lat_dms2, into = c("Lat_deg", "Lat_min", "Lat_sec"),
+             sep = " ") %>% 
+    separate(Long_dms2, into = c("Long_deg", "Long_min", "Long_sec"),
+             sep = " ") %>% 
+    mutate(across(Lat_deg:Long_sec,
+                  as.numeric)) %>% 
+    mutate(Lat_sec = case_when(ID == "MCMST3-P2" ~ 46.9,
+                               ID == "MCMST3-P5" ~ 47.8,
+                               TRUE ~ Lat_sec)) %>% 
+    mutate(Lat = round(Lat_deg + (Lat_min/60) + (Lat_sec/3600), 5),
+           Long = round(-1*(Long_deg + (Long_min/60) + (Long_sec/3600)), 5))
+
+stn_tbl <- cbm_mb %>% 
+    mutate(Lat = cbm_mb2$Lat,
+           Long = cbm_mb2$Long,
+           "SSAM-1" = ifelse(!is.na(PlotID), "yes", NA),
+           Orthometric_Height = NA,
+           Height_Relative_to_MLLW = NA,
+           Type = ifelse(!is.na(PlotID), "E", NA)) %>% 
+    select(-Lat_dms, -Long_dms) %>% 
+    select(Reserve, SiteID, TransectID, PlotID,
+           Lat, Long, Type,
+           Orthometric_Height,
+           Height_Relative_to_MLLW,
+           Distance = `Distance (m)`,
+           `SSAM-1`,
+           everything())
+```
+
+## Cover  
+
+```{r}
+covr_in <- read_excel(file_in, sheet = "Cover Data", skip = 9)
+names(covr_in)[32] <- "Unknown1"
+names(covr_in)[33] <- "Unknown2"
+covr_in[,35:37] <- NULL
+```
+
+
+## Density  
+
+```{r}
+dens_in <- read_excel(file_in, sheet = "Stem Density", skip = 9)
+names(dens_in)[27] <- "Unknown1"
+names(dens_in)[28] <- "Unknown2"
+dens <- dens_in %>% 
+    janitor::remove_empty("cols")
+```
+
+
+## Heights  
+
+```{r}
+hts_in <- read_excel(file_in, sheet = "Max Height Data", skip = 9)
+names(hts_in)[27] <- "Unknown1"
+names(hts_in)[28] <- "Unknown2"
+hts <- hts_in %>% 
+    janitor::remove_empty("cols")
+```
+
+## Species List  
+
+```{r}
+spp_covr <- read_excel(file_in, 
+                       sheet = "Cover Data", 
+                       skip = 8, n_max = 2,
+                       col_names = FALSE)
+names(spp_covr) <- names(covr_in)
+spp_covr <- spp_covr %>% 
+    filter(row_number() != 2) %>% 
+    select(Bareground:Unknown2)
+
+spp_names <- spp_covr %>% 
+    pivot_longer(everything(),
+                 names_to = "Species in column names",
+                 values_to = "Common name")
+```
+
