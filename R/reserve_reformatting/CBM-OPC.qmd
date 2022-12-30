@@ -1,0 +1,109 @@
+---
+title: "CBM-OPC"
+format: html
+---
+
+```{r}
+library(tidyverse)
+library(readxl)
+library(writexl)
+```
+
+```{r}
+# starting path for data
+path_start <- here::here("submitted_data", "data")
+file_in <- here::here(path_start, "CBM", "Veg", "Otter Point Creek", 
+                      "MASTER_OPC_EV_Transect_Data_060512_LC.xls")
+
+# excel_sheets(file_in)
+```
+
+from mapping script - to read in file and deal with coordinates  
+
+## Station Table  
+
+```{r}
+cbm_prep <- read_xls(file_in, sheet = "Site Descriptions",
+                    skip = 9)
+names(cbm_prep)[4:5] <- c("Lat", "Long")
+
+cbm_opc <- read_xls(file_in, sheet = "Site Descriptions",
+                     skip = 12,
+                     col_names = FALSE)
+names(cbm_opc) <- names(cbm_prep)
+rm(cbm_prep)
+
+cbm_opc <- cbm_opc %>% 
+    fill(Transect) %>% 
+    mutate(Reserve = "CBM",
+           SiteID = "MB",
+           Lat = round(Lat, 5),
+           Long = -1 * round(Long, 5)) %>% 
+    select(-"...6", -"...7") %>% 
+    select(Reserve, SiteID,
+           TransectID = Transect,
+           PlotID = Plot,
+           Lat, Long,
+           everything())
+
+stn_tbl <- cbm_opc %>% 
+    mutate("SSAM-1" = ifelse(!is.na(PlotID), "yes", NA),
+           Orthometric_Height = NA,
+           Height_Relative_to_MLLW = NA,
+           Type = ifelse(!is.na(PlotID), "E", NA)) %>% 
+    select(Reserve, SiteID, TransectID, PlotID,
+           Lat, Long, Type,
+           Orthometric_Height,
+           Height_Relative_to_MLLW,
+           Distance = `Distance (m)`,
+           `SSAM-1`,
+           everything())
+```
+
+## Cover  
+
+Date entry problem for WDCT4-P5 in 2012 - entered as "7/17/201". Updating to "41107" which is the Excel numeric date that corresponds.  
+
+```{r}
+covr_in <- read_excel(file_in, sheet = "Cover Data", skip = 12)
+covr_in <- covr_in %>% 
+    mutate(Date = ifelse(Date == "07/17/201", "41107", Date),
+           Date = janitor::excel_numeric_to_date(as.numeric(Date)))
+```
+
+
+## Density  
+
+```{r}
+dens_in <- read_excel(file_in, sheet = "Stem Density", skip = 11)
+dens <- dens_in %>% 
+    janitor::remove_empty("cols")
+```
+
+
+## Heights  
+
+```{r}
+hts_in <- read_excel(file_in, sheet = "Max Height Data", skip = 9)
+hts <- hts_in %>% 
+    janitor::remove_empty("cols")
+```
+
+## Species List  
+
+```{r}
+spp_covr <- read_excel(file_in, 
+                       sheet = "Cover Data", 
+                       skip = 11, n_max = 2,
+                       col_names = FALSE)
+names(spp_covr) <- names(covr_in)
+spp_covr <- spp_covr %>% 
+    filter(row_number() != 2) %>% 
+    select(6:93)
+
+spp_names <- spp_covr %>% 
+    pivot_longer(everything(),
+                 names_to = "Species in column names",
+                 values_to = "Common name")
+```
+
