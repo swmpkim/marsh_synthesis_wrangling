@@ -87,6 +87,10 @@ cbv_hts <- cbv_test %>%
     fl_cols("Canopy Height 1") %>% 
     fl_cols("Canopy Height 2") %>% 
     fl_cols("Canopy Height 3")
+
+write.csv(cbv_hts, file = here::here("wrangled_data", "combined_with_issues", "CBV_height_reformatting.csv"),
+          row.names = FALSE,
+          na = "")
 ```
 
 
