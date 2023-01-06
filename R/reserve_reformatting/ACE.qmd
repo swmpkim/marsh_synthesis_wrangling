@@ -27,7 +27,7 @@ if(!dir.exists(path_out)){
 # dir(path_start)
 # excel_sheets(here::here(path_start, "ACE Basin biomonitoring data_11Aug2021.xlsx"))
 pi_cov <- read_xlsx(here::here(path_start, 
-                               "ACE Basin biomonitoring data_11Aug2021.xlsx"),
+                               "ACE Basin biomonitoring data_11Aug2021_smu.xlsx"),
                     sheet = "PerCov_raw")
 
 cov_summ <- pi_cov %>% 
@@ -42,20 +42,17 @@ cov_summ <- pi_cov %>%
 
 ```{r}
 hts <- read_xlsx(here::here(path_start, 
-                               "ACE Basin biomonitoring data_11Aug2021.xlsx"),
+                               "ACE Basin biomonitoring data_11Aug2021_smu.xlsx"),
                     sheet = "SpHt_raw")
 
 # ignoring SubQuad to make a new plant num column, then pivot wider
 hts_wide <- hts %>% 
     group_by(Date, PlotID) %>% 
     mutate(PlantNum2 = 1:n()) %>%  
+    rename(SpaAlt = "SpaAlt(cm)") %>% 
     select(Date, PlotID, PlantNum2, SpaAlt) %>% 
     pivot_wider(names_from = PlantNum2,
                 names_prefix = "Spartina alterniflora_",
                 values_from = SpaAlt)
-
-# see where all those columns are coming from
-# hts_wide %>% filter(!is.na(`Spartina alterniflora_67`)) %>% View()
-# hts_wide %>% filter(!is.na(`Spartina alterniflora_36`)) %>% View()
 ```
 
