@@ -41,11 +41,16 @@ source(here::here("R", "sourced", "00_helper_functions.R"))
 
 ## Data path  
 
-Just one file to read here.
+Just one file to read here.  
+
+1/9/23: path updated to corrected file from Scott L., which was actually sent in June 2022.  
 
 ```{r}
+# path_start <- here::here("submitted_data", "data", reserve, 
+#                          "CBNERRVA Veg Data GI Reserve for Chris Peter.xlsx")
+
 path_start <- here::here("submitted_data", "data", reserve, 
-                         "CBNERRVA Veg Data GI Reserve for Chris Peter.xlsx")
+                         "GI Vegetation Data All Years for Kim.xlsx")
 
 problem_path_out <- here::here("wrangled_data", "combined_with_issues")
 
@@ -65,10 +70,26 @@ Read into a list and combine  **MODIFY FOR DIFFERENT DATA TYPES**
 This section will compile code to read in and combine files that are already in CDMO format. Then a long CDMO-format file will be generated, after reconciling column names, dates, and putting things in order. The NaMaSTe template file will be generated from the CDMO-format file.  
 
 ```{r}
-dat_all <- read_cdmo(path_start)
+shts <- excel_sheets(path_start)
+dat_in <- list()
+
+for(i in seq_along(shts)){
+    tmp <- read_cdmo(path_start, 
+                           worksheet = shts[i]) %>% 
+        mutate(across(c("Density Quad Size", "Distance"),
+                      as.character))
+    
+    dat_in[[i]] <- tmp
+}
+
+if(janitor::compare_df_cols_same(dat_in)){
+    dat_all <- bind_rows(dat_in)
+} else {
+    warning("dfs WILL NOT BIND")
+}
 ```
 
-
+Had to force Density Quad Size (contains "NC" - looks like Density and Canopy Height(s) also contain this, and it looks to mean "not collected") and Distance ("60 ish") to character. Canopy Height 1 column still contains some "~" characters (~120; ~70-80; ~80-90).    
 
 # Checks  
 
@@ -79,6 +100,15 @@ Look for different column names for the same thing.
 ```{r}
 names(dat_all)
 ```
+
+Deal with the dual density columns  
+
+```{r}
+names(dat_all)[18] <- "Quad_count"
+names(dat_all)[19] <- "Density"
+```
+
+
 
 ## Duplicates in date-site-transect-plot-species  
 
