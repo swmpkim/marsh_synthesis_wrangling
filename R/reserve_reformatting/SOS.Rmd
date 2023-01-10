@@ -294,6 +294,8 @@ names(abbrevs) <- c("code", "Species")
 Issues to fix:  
 
 +  Date is sometimes mm/dd/yyyy and other times Excel's date format. Split these out and unify.  
++  per 1/10/2023 emails with Alice: Site DP (in dens/ht file) is the same site as Site DM (in Pct_cover file). Updating DP to DM here.  
++  also found 1/10/2023: Year column is present in dens_ht spreadsheet, and the way I handled the data, it's causing Year.X and Year.Y columns during the join (shouldn't they match???) In any case, getting rid of that column here.  
 
 ```{r}
 dens_ht <- dens_ht %>% 
@@ -305,9 +307,11 @@ dens_ht <- dens_ht %>%
                             !is.na(Date_mdy) ~ lubridate::mdy(Date_mdy)),
            across(c(`AGRSTO ct`:`OENSAR ht3`), as.numeric),
            TransectID = as.character(TransectID),
-           PlotID = as.character(PlotID)) %>% 
+           PlotID = as.character(PlotID),
+           Site = case_when(Site == "DP" ~ "DM",
+                            TRUE ~ Site)) %>% 
     rename(SiteID = Site) %>% 
-    select(-Date_excel, -Date_mdy)
+    select(-Date_excel, -Date_mdy, -Year)
 ```
 
 ## Split out density and height  
@@ -318,7 +322,7 @@ dens_names <- all_names[str_ends(all_names, pattern = " ct")]
 ht_names <- all_names[str_ends(all_names, pattern = " ht[1-3]")]
 
 dens <- dens_ht %>% 
-    select(ID:Year, "Notes" = NOTES, all_of(dens_names)) %>% 
+    select(ID:Date, "Notes" = NOTES, all_of(dens_names)) %>% 
     pivot_longer(-(ID:Notes), 
                  names_to = c("code", "param"), 
                  names_sep = " ",
@@ -329,13 +333,13 @@ dens <- dens_ht %>%
     relocate(Species, .before = Density)
     
 hts <- dens_ht %>% 
-    select(ID:Year, "Notes" = NOTES, all_of(ht_names))%>% 
+    select(ID:Date, "Notes" = NOTES, all_of(ht_names))%>% 
     pivot_longer(-(ID:Notes), 
                  names_to = c("code", "param"), 
                  names_sep = " ",
                  values_to = "Height") %>% 
     filter(!is.na(Height)) %>%
-    group_by(SiteID, TransectID, PlotID, Year, Date, code) %>% 
+    group_by(SiteID, TransectID, PlotID, Date, code) %>% 
     summarize(Height = mean(Height)) %>% 
     full_join(abbrevs) %>% 
     select(-code) %>% 
@@ -346,7 +350,44 @@ hts <- dens_ht %>%
 ## Add density and height to CDMO-formatted data frame  
 
 ```{r}
-dat_all <- dat_all %>% 
+dat_all %>% janitor::get_dupes(SiteID, TransectID, PlotID, Species, Date) %>% View()
+
+
+dat_all_problem_version <- dat_all %>% 
+    full_join(hts, by = c("SiteID", "TransectID", "PlotID", "Species", "Date")) %>% 
+    full_join(dens, by = c("SiteID", "TransectID", "PlotID", "Species", "Date"))
+
+
+
+non_matching <- dat_all_problem_version %>% 
+    filter(is.na(Reserve))
+
+sum(is.na(dat_all$Reserve))  # 0 - so the hts/dens records aren't matching with existing Site/Transect/Plot/Species/Date combos
+
+# is it sites or dates that don't match? Because there aren't dupes for the other ID columns....
+
+dat_all_problems2 <- dat_all_problem_version %>% 
+    mutate(Year = lubridate::year(Date))
+
+dat_all_problems2 %>% 
+    janitor::get_dupes(SiteID, TransectID, PlotID, Species, Year) %>%
+    View()
+
+dates_different <- dat_all_problems2 %>% 
+    janitor::get_dupes(SiteID, TransectID, PlotID, Species, Year)
+
+writexl::write_xlsx(dates_different, here::here("wrangled_data",
+                                                "combined_with_issues",
+                                                "SOS_dates_diff_cov_vs_htdens.xlsx"))
+```
+
+
+
+```{r}
+hts2 <- hts %>% 
+    
+dat_all2 <- dat_all %>% 
+    select(-Reserve, -Type) %>% 
     full_join(hts, by = c("SiteID", "TransectID", "PlotID", "Species", "Date")) %>% 
     full_join(dens, by = c("SiteID", "TransectID", "PlotID", "Species", "Date"))
 ```
