@@ -365,28 +365,41 @@ dat_all <- dat_all %>%
     relocate(Year, .after = Date)
 
 
+# pull out heights that don't have corresponding entries in the cover data frame
 ht_uniques <- anti_join(hts, dat_all)
+# pull out info about each site/transect/plot/date combo and join it with those unique values so they have all the assoicated plot metadata
 ht_uniques_filledin <- dat_all %>% 
     select(-Species, -Cover) %>% 
     distinct() %>% 
     right_join(ht_uniques) # %>% View()
 
-
+# same as height data frame stuff, but on density
 dens_uniques <- anti_join(dens, dat_all)
 dens_uniques_filledin <- dat_all %>% 
     select(-Species, -Cover) %>% 
     distinct() %>% 
     right_join(dens_uniques)
 
+# join height and density uniques (no entry in 'cover') together, because 2 match
+htdens_uniques <- full_join(ht_uniques_filledin, dens_uniques_filledin)
 
+# join the matching height and density data frames to cover,
+# then bind the height and density uniques from above
 dat_all2 <- dat_all %>% 
     left_join(hts, by = c("SiteID", "TransectID", "PlotID", "Species", "Year")) %>% 
-    left_join(dens, by = c("SiteID", "TransectID", "PlotID", "Species", "Year")) %>% 
-    bind_rows(ht_uniques_filledin) %>% 
-    full_join(dens_uniques_filledin)
-
-dat_all3 <- dat_all2 %>% 
+    left_join(dens, by = c("SiteID", "TransectID", "PlotID", "Species", "Year", "Date_HtDens")) %>% 
+    bind_rows(htdens_uniques) %>% 
     arrange(Year, SiteID, TransectID, PlotID, Species)
+
+# make sure nothing got inadvertently duplicated (all good)
+# janitor::get_dupes(dat_all2, SiteID, TransectID, PlotID, Year, Species)
+
+dat_all <- dat_all2
+```
+
+
+```{r}
+# testing joins while trying to figure out the above
 
 
 # test <- dat_all2 %>% filter(is.na(Reserve))
@@ -414,15 +427,24 @@ dat_all3 <- dat_all2 %>%
 #                                                 "SOS_dates_diff_cov_vs_htdens.xlsx"))
 ```
 
-
+Deal with the date issues from 2015 and 2020  
 
 ```{r}
-hts2 <- hts %>% 
-    
+# test <- dat_all %>% filter(!is.na(Date_HtDens), Year %in% c(2015, 2020))
+# sum(test$Date != test$Date_HtDens)
+
+# weird things happened filtering after doing case_when on the dates directly
+# but it was okay when I converted them to character first
+# so that's how I'm replacing the wrong HtDens dates in 2015 and 2020
 dat_all2 <- dat_all %>% 
-    select(-Reserve, -Type) %>% 
-    full_join(hts, by = c("SiteID", "TransectID", "PlotID", "Species", "Date")) %>% 
-    full_join(dens, by = c("SiteID", "TransectID", "PlotID", "Species", "Date"))
+    mutate(across(c(Date, Date_HtDens), as.character),
+           Date_HtDens = case_when(Year %in% c(2015, 2020) ~ Date,
+                                    TRUE ~ Date_HtDens),
+           across(c(Date, Date_HtDens), as.Date))
+
+
+# test <- dat_all2 %>% filter(!is.na(Date_HtDens), Year %in% c(2015, 2020))
+# sum(test$Date != test$Date_HtDens)
 ```
 
 
