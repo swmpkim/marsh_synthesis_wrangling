@@ -554,7 +554,8 @@ station_table <- dat_cdmo %>%
            Long,
            Type,
            "SSAM-1") %>% 
-    distinct()
+    distinct() %>% 
+    arrange(SiteID, TransectID, PlotID)
 ```
 
 Do any plots have multiple rows?  

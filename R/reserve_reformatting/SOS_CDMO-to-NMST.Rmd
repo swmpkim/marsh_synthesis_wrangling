@@ -102,14 +102,33 @@ if(!exists("Height_Relative_to_MLLW", dat)){
 ```
 
 
+Make sure every row has the appropriate value for Date_HtDens. Sort by site-transect-plot and Date_HtDens, then fill.   
+
+```{r}
+dat <- dat %>% 
+    arrange(Year, SiteID, TransectID, PlotID, Date_HtDens) %>% 
+    fill(Date_HtDens, .direction = "down")
+
+# make sure I didn't just introduce duplicates or weirdnesses  
+# dat2 %>% 
+#     select(Year, SiteID, TransectID, PlotID, Date_HtDens) %>% 
+#     distinct() %>% 
+#     janitor::get_dupes()
+```
+
+
+
 ## Identifiers  
 
 Should be the same between all sheets  
 
+update on 1/12/2023: added "Date_HtDens" to id_names
+
 ```{r}
 id_names <- c("Reserve", "SiteID", 
              "Year", "Month", "Day",
-             "TransectID", "PlotID",
+             "Date_HtDens",
+             "TransectID", "PlotID", # "Subplot",
              "Orthometric_Height", "Height_Relative_to_MLLW",
              "Distance")
 
@@ -120,6 +139,8 @@ id_names <- id_names[which(id_names %in% names(dat))]
 ## Deal with notes separately  
 
 If there's not a Notes column, make one full of NAs.  
+
+NOTE there was a notes column in the original data files but it was not propagated here.....
 
 ```{r}
 if(exists("Notes", dat)){
@@ -154,6 +175,7 @@ janitor::get_dupes(covr, -Cover)
 ```{r}
 # pivot
 covr_wide <- covr %>% 
+    mutate(Date_HtDens = as.Date(Date_HtDens)) %>% 
     rename("F" = QAQC) %>% 
     pivot_wider(names_from = Species,
                 values_from = c(Cover, "F"),
@@ -161,6 +183,13 @@ covr_wide <- covr %>%
 
 # get the 'Cover' prefix out of the names
 names(covr_wide) <- str_replace(names(covr_wide), "^(Cover_)", "")
+
+# get rid of the NA and F_NA columns
+covr_wide <- covr_wide %>% 
+    select(-"NA", -"F_NA")
+
+# check again for dupes
+janitor::get_dupes(covr_wide, Year, Month, Day, SiteID, TransectID, PlotID)
 ```
 
 
@@ -257,9 +286,11 @@ names(abbrevs) <- c("code", "Species")
 Issues to fix:  
 
 +  Date is sometimes mm/dd/yyyy and other times Excel's date format. Split these out and unify.  
++  Site DP is really DM; corrected here  
 
 ```{r}
 dens_ht <- dens_ht %>% 
+    select(-Year) %>% 
     mutate(Date_excel = as.numeric(case_when(!str_detect(Date, "/") ~ Date,
                                              TRUE ~ NA_character_)),
            Date_mdy = case_when(str_detect(Date, "/") ~ Date,
@@ -268,10 +299,16 @@ dens_ht <- dens_ht %>%
                             !is.na(Date_mdy) ~ lubridate::mdy(Date_mdy)),
            across(c(`AGRSTO ct`:`OENSAR ht3`), as.numeric),
            TransectID = as.character(TransectID),
-           PlotID = as.character(PlotID)) %>% 
+           PlotID = as.character(PlotID),
+           Site = case_when(Site == "DP" ~ "DM",
+                            TRUE ~ Site),
+           Year = lubridate::year(Date)) %>% 
     rename(SiteID = Site) %>% 
+    relocate(Year, .after = Date) %>% 
     select(-Date_excel, -Date_mdy)
 ```
+
+Added Year column for joining with cover sheet. Some dates possibly still wrong in ht/dens spreadsheet so really only want to join on year-site-transect-plot and pull the additional info from the cover data frame.  
 
 ## Split out density and height  
 
@@ -310,17 +347,32 @@ hts <- dens_ht %>%
 ## Pivot  
 
 ```{r}
-dens_sheet <- dens %>% 
+dens_wide <- dens %>% 
+    select(SiteID, TransectID, PlotID, Year, Species, Density) %>% 
+    filter(!is.na(Density)) %>% 
     pivot_wider(names_from = Species,
                 values_from = Density,
                 names_sort = TRUE)
 
-hts_sheet <- hts %>% 
+hts_wide <- hts %>% 
+    select(SiteID, TransectID, PlotID, Year, Species, Height) %>%
+    filter(!is.na(Height)) %>% 
     pivot_wider(names_from = Species,
                 values_from = Height,
                 names_sort = TRUE)
 ```
 
+Join back with ID columns from cover data frame  
+
+```{r}
+dens_sheet <- covr_wide %>% 
+    select(Reserve:Distance) %>% 
+    full_join(dens_wide, by = c("Year", "SiteID", "TransectID", "PlotID"))
+
+hts_sheet <- covr_wide %>% 
+    select(Reserve:Distance) %>% 
+    full_join(hts_wide, by = c("Year", "SiteID", "TransectID", "PlotID"))
+```
 
 
 # Other sheets  
