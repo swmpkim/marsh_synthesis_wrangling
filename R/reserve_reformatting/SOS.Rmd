@@ -296,9 +296,13 @@ Issues to fix:
 +  Date is sometimes mm/dd/yyyy and other times Excel's date format. Split these out and unify.  
 +  per 1/10/2023 emails with Alice: Site DP (in dens/ht file) is the same site as Site DM (in Pct_cover file). Updating DP to DM here.  
 +  also found 1/10/2023: Year column is present in dens_ht spreadsheet, and the way I handled the data, it's causing Year.X and Year.Y columns during the join (shouldn't they match???) In any case, getting rid of that column here.  
++  Sometimes dates of density/height measurements are different from the dates when cover was measured. In 2010 and 2011, this was due to methodological differences. In 2015 and 2020, these are typos.  
+    +  Fixing 2015 and 2020 dates based on what Jenni sent 1/11/23. Will do this after data frames are joined; can do a case_when so that if year is 2015 or 2020, Date_HtDens = Date.    
+    +  Calling column in this data frame "Date_HtDens" to differentiate from Cover date, but still allow joining by year.  
 
 ```{r}
 dens_ht <- dens_ht %>% 
+    select(-Year) %>% 
     mutate(Date_excel = as.numeric(case_when(!str_detect(Date, "/") ~ Date,
                                              TRUE ~ NA_character_)),
            Date_mdy = case_when(str_detect(Date, "/") ~ Date,
@@ -309,9 +313,11 @@ dens_ht <- dens_ht %>%
            TransectID = as.character(TransectID),
            PlotID = as.character(PlotID),
            Site = case_when(Site == "DP" ~ "DM",
-                            TRUE ~ Site)) %>% 
-    rename(SiteID = Site) %>% 
-    select(-Date_excel, -Date_mdy, -Year)
+                            TRUE ~ Site),
+           Year = lubridate::year(Date)) %>% 
+    rename(SiteID = Site,
+           Date_HtDens = Date) %>% 
+    select(-Date_excel, -Date_mdy)
 ```
 
 ## Split out density and height  
@@ -322,7 +328,7 @@ dens_names <- all_names[str_ends(all_names, pattern = " ct")]
 ht_names <- all_names[str_ends(all_names, pattern = " ht[1-3]")]
 
 dens <- dens_ht %>% 
-    select(ID:Date, "Notes" = NOTES, all_of(dens_names)) %>% 
+    select(ID:Date_HtDens, Year, "Notes" = NOTES, all_of(dens_names)) %>% 
     pivot_longer(-(ID:Notes), 
                  names_to = c("code", "param"), 
                  names_sep = " ",
@@ -333,13 +339,13 @@ dens <- dens_ht %>%
     relocate(Species, .before = Density)
     
 hts <- dens_ht %>% 
-    select(ID:Date, "Notes" = NOTES, all_of(ht_names))%>% 
+    select(ID:Date_HtDens, Year, "Notes" = NOTES, all_of(ht_names))%>% 
     pivot_longer(-(ID:Notes), 
                  names_to = c("code", "param"), 
                  names_sep = " ",
                  values_to = "Height") %>% 
     filter(!is.na(Height)) %>%
-    group_by(SiteID, TransectID, PlotID, Date, code) %>% 
+    group_by(SiteID, TransectID, PlotID, Date_HtDens, Year, code) %>% 
     summarize(Height = mean(Height)) %>% 
     full_join(abbrevs) %>% 
     select(-code) %>% 
@@ -350,35 +356,62 @@ hts <- dens_ht %>%
 ## Add density and height to CDMO-formatted data frame  
 
 ```{r}
-dat_all %>% janitor::get_dupes(SiteID, TransectID, PlotID, Species, Date) %>% View()
+# dat_all %>% janitor::get_dupes(SiteID, TransectID, PlotID, Species, Date) %>% View()
+
+# create year column in dat_all first - safer to do here than above given all the code that's already run  
+
+dat_all <- dat_all %>% 
+    mutate(Year = lubridate::year(Date)) %>% 
+    relocate(Year, .after = Date)
 
 
-dat_all_problem_version <- dat_all %>% 
-    full_join(hts, by = c("SiteID", "TransectID", "PlotID", "Species", "Date")) %>% 
-    full_join(dens, by = c("SiteID", "TransectID", "PlotID", "Species", "Date"))
+ht_uniques <- anti_join(hts, dat_all)
+ht_uniques_filledin <- dat_all %>% 
+    select(-Species, -Cover) %>% 
+    distinct() %>% 
+    right_join(ht_uniques) # %>% View()
 
 
+dens_uniques <- anti_join(dens, dat_all)
+dens_uniques_filledin <- dat_all %>% 
+    select(-Species, -Cover) %>% 
+    distinct() %>% 
+    right_join(dens_uniques)
 
-non_matching <- dat_all_problem_version %>% 
-    filter(is.na(Reserve))
 
-sum(is.na(dat_all$Reserve))  # 0 - so the hts/dens records aren't matching with existing Site/Transect/Plot/Species/Date combos
+dat_all2 <- dat_all %>% 
+    left_join(hts, by = c("SiteID", "TransectID", "PlotID", "Species", "Year")) %>% 
+    left_join(dens, by = c("SiteID", "TransectID", "PlotID", "Species", "Year")) %>% 
+    bind_rows(ht_uniques_filledin) %>% 
+    full_join(dens_uniques_filledin)
+
+dat_all3 <- dat_all2 %>% 
+    arrange(Year, SiteID, TransectID, PlotID, Species)
+
+
+# test <- dat_all2 %>% filter(is.na(Reserve))
+# write_xlsx(test, here::here("wrangled_data", "combined_with_issues", "SOS_HtDens_noCover.xlsx"))
+
+# non_matching <- dat_all_problem_version %>% 
+#     filter(is.na(Reserve))
+# 
+# sum(is.na(dat_all$Reserve))  # 0 - so the hts/dens records aren't matching with existing Site/Transect/Plot/Species/Date combos
 
 # is it sites or dates that don't match? Because there aren't dupes for the other ID columns....
 
-dat_all_problems2 <- dat_all_problem_version %>% 
-    mutate(Year = lubridate::year(Date))
-
-dat_all_problems2 %>% 
-    janitor::get_dupes(SiteID, TransectID, PlotID, Species, Year) %>%
-    View()
-
-dates_different <- dat_all_problems2 %>% 
-    janitor::get_dupes(SiteID, TransectID, PlotID, Species, Year)
-
-writexl::write_xlsx(dates_different, here::here("wrangled_data",
-                                                "combined_with_issues",
-                                                "SOS_dates_diff_cov_vs_htdens.xlsx"))
+# dat_all_problems2 <- dat_all_problem_version %>% 
+#     mutate(Year = lubridate::year(Date))
+# 
+# dat_all_problems2 %>% 
+#     janitor::get_dupes(SiteID, TransectID, PlotID, Species, Year) %>%
+#     View()
+# 
+# dates_different <- dat_all_problems2 %>% 
+#     janitor::get_dupes(SiteID, TransectID, PlotID, Species, Year)
+# 
+# writexl::write_xlsx(dates_different, here::here("wrangled_data",
+#                                                 "combined_with_issues",
+#                                                 "SOS_dates_diff_cov_vs_htdens.xlsx"))
 ```
 
 
