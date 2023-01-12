@@ -521,7 +521,8 @@ dat_cdmo <- dat_all %>%
         "Density",
         "Maximum Canopy Height" = Height,
         "QAQC"
-    )
+    ) %>% 
+    arrange(Year, Month, Day, SiteID, TransectID, PlotID, Species)
 ```
 
 
