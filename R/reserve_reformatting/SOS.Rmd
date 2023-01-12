@@ -442,6 +442,8 @@ dat_all2 <- dat_all %>%
                                     TRUE ~ Date_HtDens),
            across(c(Date, Date_HtDens), as.Date))
 
+dat_all <- dat_all2
+
 
 # test <- dat_all2 %>% filter(!is.na(Date_HtDens), Year %in% c(2015, 2020))
 # sum(test$Date != test$Date_HtDens)
@@ -458,18 +460,6 @@ Will average heights to get into CDMO format. Will insert density where it belon
 
 ## Column wrangling  
 
-Pull out columns for Month, Day, and Year; and format Date as mm/dd/yyyy for the CDMO output file.  
-
-```{r}
-dat_all <- dat_all %>% 
-    mutate(
-        Year = lubridate::year(Date),
-        Month = lubridate::month(Date),
-        Day = lubridate::mday(Date),
-        Date = format(Date, "%m/%d/%Y")
-    ) 
-```
-
 
 
 ## CDMO format (long)  
@@ -479,14 +469,32 @@ CDMO column names, in order. If columns had different names, or there were addit
 ```{r}
 # add in missing columns
 dat_all <- dat_all %>% 
-    mutate(Subplot = NA,
+    mutate(Subplot = glue::glue("{Plot_nom} - {`Subplot locator`}",
+                                .na = ""),
+           Subplot = ifelse(Subplot == " - ", NA_character_, Subplot),
            Rep = NA,
            Lat = NA,
            Long = NA,
            "Orthometric Height" = NA,
            "Height Relative to MLLW" = NA,
-           QAQC = NA)
+           QAQC = NA_character_)
 
+# ADD QAQC CODES WHEN DATES DIDN'T MATCH
+dat_all$QAQC[which(dat_all$Date != dat_all$Date_HtDens)] <- "0 CSM"
+```
+
+Pull out columns for Month, Day, and Year; and format Date as mm/dd/yyyy for the CDMO output file.  
+
+```{r}
+dat_all <- dat_all %>% 
+    mutate(
+        Month = lubridate::month(Date),
+        Day = lubridate::mday(Date),
+        Date = format(Date, "%m/%d/%Y")
+    ) 
+```
+
+```{r}
 
 dat_cdmo <- dat_all %>% 
     select(
@@ -496,6 +504,7 @@ dat_cdmo <- dat_all %>%
         "Year",
         "Month",
         "Day",
+        "Date_HtDens",
         "SiteID",
         "TransectID",
         "PlotID",
@@ -519,9 +528,9 @@ dat_cdmo <- dat_all %>%
 ## Write the CDMO data frame to a file. **Modify for each reserve**  
 
 ```{r}
-write.csv(dat_cdmo, here::here(problem_path_out, paste0(reserve, "_issues.csv")), 
-          row.names= FALSE,
-          na = "")
+# write.csv(dat_cdmo, here::here(problem_path_out, paste0(reserve, "_issues.csv")), 
+#           row.names= FALSE,
+#           na = "")
 ```
 
 ```{r}
