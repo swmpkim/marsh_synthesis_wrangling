@@ -309,7 +309,80 @@ dat_cdmo %>%
 ```
 
 
+
 ## Correct discrepancies  
+
+A few plots had lat/long/elevation errors (copied from the plot above them) that made extra rows in the NMST format. Those time periods were:  
+
++  09/14/2010, Segment B, Transect 2, Plot 9  
++  09/18/2007, Segment B, Transect 1, Plot 5  
++  09/22/2015, Segment B, Transect 2, Plot 9  
+
+Want to replace these with the values from the row below each (from subplot 1 into subplot 'NA').  
+
+Date is character format, so it ought to be easy to pull out the indices and do it.  
+
+```{r}
+# pull out column indices
+colsToFix <- which(names(dat_cdmo) %in% c("SSAM-1", "Lat", "Long", "Distance", "Orthometric Height", "Height Relative to MLLW"))
+
+
+# FIRST IN THE LIST
+# pull out row indices
+issue1 <- dat_cdmo %>% 
+    mutate(rownum = row_number()) %>% 
+    filter(Date == "09/14/2010",
+           SiteID == "Segment B",
+           TransectID == 2,
+           PlotID == 9) %>% 
+    select(rownum) %>% 
+    unlist()
+# make sure I'm looking at the right things
+dat_cdmo[issue1, colsToFix]
+# make the change
+dat_cdmo[issue1[1], colsToFix] <- dat_cdmo[issue1[2], colsToFix]
+# make sure it looks fixed
+dat_cdmo[issue1, colsToFix]
+
+# SECOND IN THE LIST
+# pull out row indices
+issue2 <- dat_cdmo %>% 
+    mutate(rownum = row_number()) %>% 
+    filter(Date == "09/18/2007",
+           SiteID == "Segment B",
+           TransectID == 1,
+           PlotID == 5) %>% 
+    select(rownum) %>% 
+    unlist()
+
+# make sure I'm looking at the right things
+dat_cdmo[issue2, colsToFix]
+# make the change
+dat_cdmo[issue2[1], colsToFix] <- dat_cdmo[issue2[2], colsToFix]
+# make sure it looks fixed
+dat_cdmo[issue2, colsToFix]
+
+
+# THIRD IN THE LIST
+# pull out row indices
+issue3 <- dat_cdmo %>% 
+    mutate(rownum = row_number()) %>% 
+    filter(Date == "09/22/2015",
+           SiteID == "Segment B",
+           TransectID == 2,
+           PlotID == 9) %>% 
+    select(rownum) %>% 
+    unlist()
+
+# make sure I'm looking at the right things
+dat_cdmo[issue3, colsToFix]
+# make the change
+dat_cdmo[issue3[1], colsToFix] <- dat_cdmo[issue3[2], colsToFix]
+# make sure it looks fixed
+dat_cdmo[issue3, colsToFix]
+```
+
+
 
 
 ## Write the CDMO data frame to a file. **Modify for each reserve**  
@@ -518,6 +591,18 @@ spp_names <- dat %>%
     arrange(Species)
 ```
 
+
+# Make sure dupes are gone  
+
+```{r}
+NMST_dupes <- covr_sheet_out %>% 
+    mutate(NMSTrownum = row_number()) %>% 
+    janitor::get_dupes(Date, SiteID, TransectID, PlotID) %>% 
+    relocate(NMSTrownum) %>% 
+    select(NMSTrownum:`Height Relative to MLLW`)
+
+# View(NMST_dupes)
+```
 
 
 
