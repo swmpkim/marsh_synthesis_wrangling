@@ -1,0 +1,48 @@
+---
+title: "Grand Bay Update"
+author: "Kim Cressman"
+date: "2023-01-13; latest update `r Sys.Date()`"
+output: 
+    html_document:
+        toc: true
+        toc_depth: 2
+        code_folding: hide
+---
+
+Some manual corrections to species names, and duplicates, were performed on GND files, and in January of 2023 we discovered some issues with site names. Sometimes site "clmaj" was entered as "clamj", and "spalt" was entered as "spal". Need to update this without undoing all the other fixes, so I am modifying the CDMO file we had generated. I have renamed the 'original' CDMO file "GND_CDMO_SiteIssues" and will work off of that.    
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      warning = FALSE,
+                      message = FALSE)
+```
+
+```{r}
+library(tidyverse)
+library(readxl)
+library(writexl)
+```
+
+```{r}
+dat <- read_xlsx(here::here("wrangled_data", 
+                            "combined_with_issues",
+                            "GND_CDMO_SiteIssues.xlsx"),
+                 na = c("", "NA")) 
+
+table(dat$SiteID)
+
+dat <- dat %>% 
+    mutate(SiteID = case_when(SiteID == "clamj" ~ "clmaj",
+                              SiteID == "spal" ~ "spalt",
+                              TRUE ~ SiteID),
+           Date = format(Date, "%m/%d/%Y"))
+
+table(dat$SiteID)
+
+write_xlsx(dat, here::here("wrangled_data",
+                           "CDMO",
+                           "GND_CDMO.xlsx"),
+           format_headers = TRUE)
+```
+
