@@ -33,15 +33,17 @@ cbm_opc <- read_xls(file_in, sheet = "Site Descriptions",
 names(cbm_opc) <- names(cbm_prep)
 rm(cbm_prep)
 
+# use "Current Transect Name" column; that's what's in the data sheets
 cbm_opc <- cbm_opc %>% 
-    fill(Transect) %>% 
+    rename(TransectID = `Current Transect Name`) %>% 
+    fill(TransectID) %>% 
     mutate(Reserve = "CBM",
-           SiteID = "MB",
+           SiteID = "OPC",
            Lat = round(Lat, 5),
            Long = -1 * round(Long, 5)) %>% 
     select(-"...6", -"...7") %>% 
     select(Reserve, SiteID,
-           TransectID = Transect,
+           TransectID,
            PlotID = Plot,
            Lat, Long,
            everything())
@@ -68,7 +70,7 @@ Date entry problem for WDCT4-P5 in 2012 - entered as "7/17/201". Updating to "41
 covr_in <- read_excel(file_in, sheet = "Cover Data", skip = 12)
 covr_in <- covr_in %>% 
     mutate(Date = ifelse(Date == "07/17/201", "41107", Date),
-           Date = janitor::excel_numeric_to_date(as.numeric(Date)))
+           Date = janitor::excel_numeric_to_date(as.numeric(Date))) 
 ```
 
 
@@ -80,6 +82,13 @@ dens <- dens_in %>%
     janitor::remove_empty("cols")
 ```
 
+```{r}
+# add Density_ prefix for joining in cover sheet
+dens_to_join <- dens
+densNames <- paste("Density", names(dens), sep = "_")
+names(dens_to_join)[6:ncol(dens_to_join)] <- densNames[6:ncol(dens_to_join)]
+```
+
 
 ## Heights  
 
@@ -88,6 +97,16 @@ hts_in <- read_excel(file_in, sheet = "Max Height Data", skip = 9)
 hts <- hts_in %>% 
     janitor::remove_empty("cols")
 ```
+
+
+```{r}
+# add Maximum Canopy Height_ prefix for joining in cover sheet
+hts_to_join <- hts
+htsNames <- paste("Maximum Canopy Height", names(hts), sep = "_")
+
+names(hts_to_join)[6:ncol(hts_to_join)] <- htsNames[6:ncol(hts_to_join)]
+```
+
 
 ## Species List  
 
@@ -106,4 +125,49 @@ spp_names <- spp_covr %>%
                  names_to = "Species in column names",
                  values_to = "Common name")
 ```
+
+
+
+# Generate Cover sheet  
+
+
+## Add columns of station table info  
+
+
+```{r}
+stn_to_join <- stn_tbl %>% 
+    select(Reserve, SiteID, TransectID,
+           PlotID, Orthometric_Height,
+           Height_Relative_to_MLLW,
+           Distance) %>% 
+    filter(!is.na(PlotID))
+```
+
+```{r}
+covr_sheet <- covr_in %>% 
+    rename(TransectID = Transect,
+           PlotID = Plot) %>% 
+    left_join(stn_to_join) %>% 
+    select(Reserve, Region, SiteID,
+           Year, Date, 
+           TransectID, PlotID,
+           Orthometric_Height,
+           Height_Relative_to_MLLW,
+           Distance,
+           Notes = Comments,
+           everything())
+```
+
+
+
+## Create F_ columns for Cover sheet  
+
+
+
+
+
+
+
+## Join Density and Height  
+
 
