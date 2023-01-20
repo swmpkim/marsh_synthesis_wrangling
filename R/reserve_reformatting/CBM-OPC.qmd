@@ -53,6 +53,9 @@ stn_tbl <- cbm_opc %>%
            Orthometric_Height = NA,
            Height_Relative_to_MLLW = NA,
            Type = ifelse(!is.na(PlotID), "E", NA)) %>% 
+    fill(Heading, .direction = "down") %>% 
+    filter(!is.na(PlotID)) %>% 
+    select(-Transect) %>% 
     select(Reserve, SiteID, TransectID, PlotID,
            Lat, Long, Type,
            Orthometric_Height,
@@ -189,7 +192,7 @@ spp_covr <- spp_covr %>%
 
 spp_names <- spp_covr %>% 
     pivot_longer(everything(),
-                 names_to = "Species in column names",
+                 names_to = "Species",
                  values_to = "Common name")
 ```
 
@@ -275,12 +278,22 @@ hts_to_join <- hts_to_join %>%
 
 # Cover sheet for real  
 
+Then remove the date column and make Year, Month, Day ones.  
+
 ```{r}
 covr_sheet <- left_join(covr_sheet, dens_to_join) %>% 
     left_join(hts_to_join)
 
 # add F_ columns
 covr_sheet[ , f_names] <- NA
+
+covr_sheet <- covr_sheet %>% 
+    mutate(Year = lubridate::year(Date),
+           Month = lubridate::month(Date),
+           Day = lubridate::mday(Date)) %>% 
+    relocate(c(Month, Day), .after = Year) %>% 
+    select(-Date)
+    
 ```
 
 
@@ -312,4 +325,17 @@ hts_sheet <- covr_sheet %>%
 names(hts_sheet) <- str_remove(names(hts_sheet), "Maximum Canopy Height_")
 ```
 
+
+# Compile workbook  
+
+```{r}
+out_path <- here::here("wrangled_data", "NMST", "CBM-OPC_NMST.xlsx")
+write_xlsx(list(Station_Table = stn_tbl,
+                Species_Names = spp_names,
+                Cover = covr_sheet,
+                Density = dens_sheet,
+                Height = hts_sheet),
+           path = out_path,
+           format_headers = TRUE)
+```
 
