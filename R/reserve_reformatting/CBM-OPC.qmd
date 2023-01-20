@@ -132,7 +132,7 @@ twoDates <- transectDates %>%
 
 transectSingle <- transectDates[-which(twoDates == TRUE), ]
 
-covr2 <- left_join(covr_in, transectSingle) %>% 
+covr_in <- left_join(covr_in, transectSingle) %>% 
     filter(!is.na(Date2)) %>% 
     mutate(Date = case_when(is.na(Date) ~ Date2,
                             TRUE ~ Date)) %>% 
@@ -229,12 +229,87 @@ covr_sheet <- covr_in %>%
 
 ## Create F_ columns for Cover sheet  
 
+Don't actually add them yet because we want them behind the density and height columns, but these are the names.
 
+```{r}
+spps_in_covr <- names(covr_sheet)[12:ncol(covr_sheet)]
+f_names <- paste("F", spps_in_covr, sep = "_")
 
-
+# test <- covr_sheet
+# test[ , f_names] <- NA
+```
 
 
 
 ## Join Density and Height  
+
+Remember to get rid of NA dates (first check to make sure there's not real data in there)  
+
+```{r}
+sum(is.na(dens_to_join$Date))
+dens_to_join %>% 
+    filter(is.na(Date)) %>% 
+    janitor::remove_empty("cols") 
+
+sum(is.na(hts_to_join$Date))
+hts_to_join %>% 
+    filter(is.na(Date)) %>% 
+    janitor::remove_empty("cols") # %>% View()
+```
+
+Everything with NA for date in the density and heights sheets also has no data, so can be disregarded.  
+
+```{r}
+dens_to_join <- dens_to_join %>% 
+    filter(!is.na(Date)) %>% 
+    select(-Density_Comments) %>% 
+    rename(TransectID = Transect,
+           PlotID = Plot)
+
+hts_to_join <- hts_to_join %>% 
+    filter(!is.na(Date)) %>% 
+    select(-`Maximum Canopy Height_Comments`) %>% 
+    rename(TransectID = Transect,
+           PlotID = Plot)
+```
+
+# Cover sheet for real  
+
+```{r}
+covr_sheet <- left_join(covr_sheet, dens_to_join) %>% 
+    left_join(hts_to_join)
+
+# add F_ columns
+covr_sheet[ , f_names] <- NA
+```
+
+
+# Density sheet  
+
+Want to keep all the same rows, but only the density columns  
+
+Then remove the 'Density' prefix  
+
+```{r}
+dens_sheet <- covr_sheet %>% 
+    select(Reserve:Notes,
+           starts_with("Density_"))
+
+names(dens_sheet) <- str_remove(names(dens_sheet), "Density_")
+```
+
+
+
+# Heights sheet  
+
+Same for heights  
+
+```{r}
+hts_sheet <- covr_sheet %>% 
+    select(Reserve:Notes,
+           starts_with("Maximum Canopy Height_"))
+
+names(hts_sheet) <- str_remove(names(hts_sheet), "Maximum Canopy Height_")
+```
 
 
