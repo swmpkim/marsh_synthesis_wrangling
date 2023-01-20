@@ -73,6 +73,25 @@ covr_in <- covr_in %>%
            Date = janitor::excel_numeric_to_date(as.numeric(Date))) 
 ```
 
+## NA date issues - find rows where there are numbers  
+
+Typically an NA for date means the plot couldn't be found, so in theory any numbers entered are typos. There are some, however, so need to pull these out and investigate them.  
+
+```{r}
+# date is NA. keep only columns that have an entry *somewhere*.
+NAdates <- covr_in %>% 
+    filter(is.na(Date)) %>% 
+    janitor::remove_empty("cols")
+
+# index the rows that don't have any entries for the species and remove.
+# do rowSums on "not NAs" in the species columns and 
+# keep those which are greater than 0
+inds <- which(rowSums(!is.na(NAdates[5:ncol(NAdates)])) > 0)
+    
+to_investigate <- NAdates[inds, ]
+
+```
+
 
 ## Density  
 
