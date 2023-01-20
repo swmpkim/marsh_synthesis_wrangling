@@ -68,8 +68,9 @@ Date entry problem for WDCT4-P5 in 2012 - entered as "7/17/201". Updating to "41
 
 ```{r}
 covr_in <- read_excel(file_in, sheet = "Cover Data", skip = 12)
-covr_in <- covr_in %>% 
-    mutate(Date = ifelse(Date == "07/17/201", "41107", Date),
+covr_in2 <- covr_in %>% 
+    mutate(Date = ifelse(Date == "7/17/201", "41107", Date),
+           Date = ifelse(Date == "07/17/201", "41107", Date),
            Date = janitor::excel_numeric_to_date(as.numeric(Date))) 
 ```
 
