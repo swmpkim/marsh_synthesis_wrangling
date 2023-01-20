@@ -68,20 +68,25 @@ Date entry problem for WDCT4-P5 in 2012 - entered as "7/17/201". Updating to "41
 
 ```{r}
 covr_in <- read_excel(file_in, sheet = "Cover Data", skip = 12)
-covr_in2 <- covr_in %>% 
+covr_in <- covr_in %>% 
     mutate(Date = ifelse(Date == "7/17/201", "41107", Date),
            Date = ifelse(Date == "07/17/201", "41107", Date),
-           Date = janitor::excel_numeric_to_date(as.numeric(Date))) 
+           Date = janitor::excel_numeric_to_date(as.numeric(Date)),
+           Year = ifelse(is.na(Year), 2008, Year)) 
 ```
 
-## NA date issues - find rows where there are numbers  
+## NA date issues   
 
-Typically an NA for date means the plot couldn't be found, so in theory any numbers entered are typos. There are some, however, so need to pull these out and investigate them.  
+### get rid of 0s  
+
+Per Kyle, these were typos (there were only 2). Originally found with the following code. Just muscling the 0-to-NA thing.  
+
 
 ```{r}
 # date is NA. keep only columns that have an entry *somewhere*.
 NAdates <- covr_in %>% 
     filter(is.na(Date)) %>% 
+    select(-Comments) %>% 
     janitor::remove_empty("cols")
 
 # index the rows that don't have any entries for the species and remove.
@@ -92,6 +97,48 @@ inds <- which(rowSums(!is.na(NAdates[5:ncol(NAdates)])) > 0)
 to_investigate <- NAdates[inds, ]
 
 ```
+
+...and change.  
+
+```{r}
+rows_to_change <- covr_in %>% 
+    mutate(rownum = row_number()) %>% 
+    filter(Transect == "HHT5",
+           Plot == "P3",
+           Year %in% c(2008, 2009)) %>% 
+    select(rownum) %>% 
+    unlist()
+
+covr_in[rows_to_change, "Bidens aristosa/frondosa"] <- NA
+```
+
+
+### attach correct dates  
+
+Some transects were sampled over multiple dates. I'm assigning the first date for each transect for simplicity (even though the actual sample date may have been one of the other days - these are plots that were not sampled).  
+
+Also removing all of 2016 rows in this process (Date2 will be NA).  
+
+```{r}
+transectDates <- covr_in %>% 
+    select(Transect, Year, Date) %>% 
+    distinct() %>% 
+    filter(!is.na(Date)) %>% 
+    rename(Date2 = Date)
+
+twoDates <- transectDates %>% 
+    select(Transect, Year) %>% 
+    duplicated()
+
+transectSingle <- transectDates[-which(twoDates == TRUE), ]
+
+covr2 <- left_join(covr_in, transectSingle) %>% 
+    filter(!is.na(Date2)) %>% 
+    mutate(Date = case_when(is.na(Date) ~ Date2,
+                            TRUE ~ Date)) %>% 
+    select(-Date2)
+```
+
 
 
 ## Density  
