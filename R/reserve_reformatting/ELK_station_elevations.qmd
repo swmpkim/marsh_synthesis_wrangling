@@ -1,0 +1,33 @@
+---
+title: "ELK high marsh stuff"
+format: html
+---
+
+```{r}
+library(tidyverse)
+library(readxl)
+library(writexl)
+```
+
+```{r}
+dat <- read_xlsx(here::here("submitted_data", "data", 
+                            "ELK", "Transects_Compiled.xlsx"),
+                 sheet = "quads compiled")
+
+dat2 <- dat %>% 
+    select(High_Marsh, Year, Site, Transect, Quadrat, Elevation) %>% 
+    distinct()
+
+elvs <- dat2 %>% 
+    mutate(Transect = case_when(is.na(Transect) ~ 1,
+                                TRUE ~ Transect)) %>% 
+    filter(!is.na(Elevation)) %>% 
+    group_by(Site, Transect, Quadrat) %>% 
+    filter(Year == min(Year)) %>% 
+    relocate(High_Marsh, .after = Elevation)
+
+write_xlsx(elvs,
+           here::here("wrangled_data", "combined_with_issues",
+                      "ELK station elevations.xlsx"))    
+```
+
