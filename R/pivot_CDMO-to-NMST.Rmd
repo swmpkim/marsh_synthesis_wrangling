@@ -46,7 +46,7 @@ In a Shiny app, let someone pick this interactively. Here, hard-code. Using MAR 
 ```{r}
 # reserve <- "APA"  # contains Average and Maximum Canopy Height
 # reserve <- "CBM-JB"  # updated 8/19/22
-reserve <- "GND"  # updated 8/19/22; updated 1/13/23
+# reserve <- "GND"  # updated 8/19/22; updated 1/13/23
 # reserve <- "KAC"  # updated 8/19/22
 # reserve <- "LKS"  # updated 8/19/22
 # reserve <- "MAR"  # completed 6/17/22
@@ -59,6 +59,7 @@ reserve <- "GND"  # updated 8/19/22; updated 1/13/23
 # reserve <- "SOS"
 # reserve <- "HUD-PIER" # completed 12/20/22
 # reserve <- "HUD-TIV"  # completed 12/20/22
+reserve <- "JAC"  # completed 1/27/23
 ```
 
 ```{r}
@@ -250,6 +251,20 @@ covr_sheet <- full_join(covr_wide, dens) %>%
 if(mangroves > 0){
     covr_sheet <- full_join(covr_sheet, dat_mang) %>% 
         relocate(starts_with("F_"), .after = last_col())
+}
+```
+
+## If NA columns, remove  
+
+This can happen when reserves don't sample a site on a certain date, but they have a placeholder row in the data where species is blank. During pivoting, an 'NA' column is created. So is an 'F_NA' column.  
+
+```{r}
+if("NA" %in% names(covr_sheet)){
+    covr_sheet$"NA" <- NULL
+}
+
+if("F_NA" %in% names(covr_sheet)){
+    covr_sheet$"F_NA" <- NULL
 }
 ```
 
