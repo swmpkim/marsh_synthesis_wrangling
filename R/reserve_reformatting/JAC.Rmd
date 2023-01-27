@@ -222,6 +222,27 @@ stn_dupes <- dat_all %>%
     janitor::get_dupes(-Distance)
 
 stn_dupes
+
+counts <- dat_all %>% 
+    select(Reserve, SiteID, TransectID, PlotID, Distance) %>% 
+    group_by(Reserve, SiteID, TransectID, PlotID, Distance) %>% 
+    tally()
+
+left_join(stn_dupes, counts)
+```
+
+Transect 4, Plot 3 is labelled 66.9 only twice; 44.6 44 times. Update.  
+
+Transect 4, Plot 4 vice versa - update 44.6 to 66.9.  
+
+Transect 8, Plot 5 has one NA. Change to 89.2.
+
+```{r}
+dat_all <- dat_all %>% 
+    mutate(Distance = case_when(TransectID == 4 & PlotID == 3 ~ 44.6,
+                                TransectID == 4 & PlotID == 4 ~ 66.9,
+                                TransectID == 8 & PlotID == 5 ~ 89.2,
+                                TRUE ~ Distance))
 ```
 
 
@@ -272,10 +293,23 @@ dat_all <- dat_all %>%
 Check again for dupes, in case there were multiple unvegetated categories on a given date.  
 
 ```{r}
-janitor::get_dupes(dat_all, Date, SiteID, TransectID, PlotID, Species)
+unveg_dupes <- dat_all %>% 
+    mutate(rownum = row_number()) %>% 
+    janitor::get_dupes(Date, SiteID, TransectID, PlotID, Species) %>% 
+    relocate(rownum)
 ```
 
-good.  
+There is a dupe, transect 7 plot 5. 75% was salt panne and 15% was another type of unvegetated.   
+
+Update the first to 90% cover and remove the other row.  
+
+```{r}
+dat_all[unveg_dupes$rownum[1], "% Cover"] <- 90
+
+dat_all <- dat_all %>% 
+    filter(row_number() != unveg_dupes$rownum[2])
+```
+
 
 # Fix discrepancies  
 
