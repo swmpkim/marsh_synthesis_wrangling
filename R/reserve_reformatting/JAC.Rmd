@@ -169,6 +169,20 @@ dupes <- dat_all %>%
 ```
 
 
+Per reserve on 1/24/2023, The second entry there (row 629 in the original data sheet; cover = 35, density = 768) should be Spartina patens.  
+
+## Fix dupe  
+
+```{r}
+find_dupe <- dat_all %>% 
+    mutate(rownum = row_number()) %>% 
+    filter(PlotID == "1013-8-1",
+           Species == "Spartina alterniflora",
+           `% Cover` == 35)
+dat_all[find_dupe$rownum, "Species"] <- "Spartina patens"
+```
+
+
 ## Check station/plot names  
 
 ```{r}
@@ -177,6 +191,24 @@ dat_all %>%
     select(Reserve, SiteID, TransectID, PlotID) %>% 
     distinct() %>% 
     knitr::kable()
+```
+
+
+## Change station/plot columns to be consistent with other reserves  
+
+Per the metadata, transects 1-3 are in the "North Segment" of the reserve; 4-6 are in the "Central Segment"; and 7-9 are in the "South Segment". I will use these as site names (currently the SiteID column is populated with plot number-within-transect). Additionally, the current PlotID column is a unique ID; I will remove the unique ID (will be added in later per NMST protocols) and change the PlotID to what is currently in SiteID.  
+
+```{r}
+dat_all <- dat_all %>% 
+    select(-PlotID) %>% 
+    rename(PlotID = SiteID) %>% 
+    mutate(SiteID = case_when(TransectID %in% 1:3 ~ "North Segment",
+                             TransectID %in% 4:6 ~ "Central Segment",
+                             TransectID %in% 7:9 ~ "South Segment",
+                             TRUE ~ "Something is wrong"),
+           PlotID = as.numeric(PlotID)) %>% 
+    relocate(SiteID, .after = Date) %>% 
+    relocate(PlotID, .after = TransectID)
 ```
 
 
@@ -218,7 +250,32 @@ Also check for anything other than 'E' in 'Type'.
 unique(dat_all$Type)
 ```
 
+## Species list issues  
 
+```{r}
+spp_all
+str_detect(spp_all, "^[Uu]nveg")
+unvegs_all <- spp_all[str_detect(spp_all, "^[Uu]nveg")]
+```
+
+There's also at least one "Salicornia.spp." that should be "Salicornia spp." 
+
+## Fix species  
+
+```{r}
+dat_all <- dat_all %>% 
+    mutate(Species = case_when(Species %in% unvegs_all ~ "Unvegetated",
+                               Species == "Salicornia.spp." ~ "Salicornia spp.",
+                               TRUE ~ Species))
+```
+
+Check again for dupes, in case there were multiple unvegetated categories on a given date.  
+
+```{r}
+janitor::get_dupes(dat_all, Date, SiteID, TransectID, PlotID, Species)
+```
+
+good.  
 
 # Fix discrepancies  
 
@@ -254,20 +311,17 @@ dat_cdmo <- dat_all %>%
         "PlotID",
         "Subplot",
         "Rep",
-        "SSAM-1",
         "Lat",
         "Long",
         "Distance",
-        "Orthometric Height",
-        "Height Relative to MLLW",
+        "Orthometric Height" = Elevation,
         "Species",
-        "Cover",
+        "Cover" = `% Cover`,
         "Density",
-        "Maximum Canopy Height",
-        "Average Canopy Height",
+        "Maximum Canopy Height" = `Canopy Height`,
         "Diameter",
         "Height",
-        "QAQC"
+        "Notes"
     )
 ```
 
@@ -275,7 +329,7 @@ dat_cdmo <- dat_all %>%
 ## Write the CDMO data frame to a file. **Modify for each reserve**  
 
 ```{r}
-write_xlsx(dat_cdmo, path = here::here(path_out, "Reserve_CDMO.xlsx"),
+write_xlsx(dat_cdmo, path = here::here(path_out, "JAC_CDMO.xlsx"),
            format_headers = TRUE)
 ```
 
