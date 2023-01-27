@@ -340,6 +340,9 @@ dat_cdmo <- dat_all %>%
         "Reserve",
         "Type",
         "Date",
+        "Year",
+        "Month",
+        "Day",
         "SiteID",
         "TransectID",
         "PlotID",
@@ -380,8 +383,7 @@ station_table <- dat_cdmo %>%
            PlotID,
            Lat,
            Long,
-           Type,
-           "SSAM-1") %>% 
+           Type) %>% 
     filter(!is.na(Lat),
            !is.na(Long)) %>% 
     distinct()
