@@ -72,6 +72,8 @@ stn_tbl <- cbm_mb %>%
            Height_Relative_to_MLLW = NA,
            Type = ifelse(!is.na(PlotID), "E", NA)) %>% 
     select(-Lat_dms, -Long_dms) %>% 
+    fill(Heading, .direction = "down") %>% 
+    filter(!is.na(PlotID)) %>% 
     select(Reserve, SiteID, TransectID, PlotID,
            Lat, Long, Type,
            Orthometric_Height,
@@ -217,4 +219,148 @@ spp_names <- spp_covr %>%
                  names_to = "Species",
                  values_to = "Common name")
 ```
+
+# Generate Cover sheet  
+
+
+## Add columns of station table info  
+
+
+```{r}
+stn_to_join <- stn_tbl %>% 
+    select(Reserve, SiteID, TransectID,
+           PlotID, Orthometric_Height,
+           Height_Relative_to_MLLW,
+           Distance) %>% 
+    filter(!is.na(PlotID))
+```
+
+```{r}
+covr_sheet <- covr_in %>% 
+    rename(TransectID = Transect,
+           PlotID = Plot) %>% 
+    left_join(stn_to_join) %>% 
+    select(Reserve, `Salinity Regime`, SiteID,
+           Year, Date, 
+           TransectID, PlotID,
+           Orthometric_Height,
+           Height_Relative_to_MLLW,
+           Distance,
+           Notes = Comments,
+           everything())
+```
+
+
+
+## Create F_ columns for Cover sheet  
+
+Don't actually add them yet because we want them behind the density and height columns, but these are the names.
+
+```{r}
+spps_in_covr <- names(covr_sheet)[12:ncol(covr_sheet)]
+f_names <- paste("F", spps_in_covr, sep = "_")
+
+# test <- covr_sheet
+# test[ , f_names] <- NA
+```
+
+
+
+## Join Density and Height  
+
+Remember to get rid of NA dates (first check to make sure there's not real data in there)  
+
+```{r}
+sum(is.na(dens_to_join$Date))
+dens_to_join %>%
+    select(-`Salinity Regime`) %>% 
+    filter(is.na(Date)) %>% 
+    janitor::remove_empty("cols") 
+
+sum(is.na(hts_to_join$Date))
+hts_to_join %>% 
+    select(-`Salinity Regime`) %>% 
+    filter(is.na(Date)) %>% 
+    janitor::remove_empty("cols") # %>% View()
+```
+
+Everything with NA for date in the density and heights sheets also has no data, so can be disregarded.  
+
+```{r}
+dens_to_join <- dens_to_join %>% 
+    filter(!is.na(Date)) %>% 
+    select(-Comments) %>% 
+    rename(TransectID = Transect,
+           PlotID = Plot)
+
+hts_to_join <- hts_to_join %>% 
+    filter(!is.na(Date)) %>% 
+    select(-Comments) %>% 
+    rename(TransectID = Transect,
+           PlotID = Plot)
+```
+
+# Cover sheet for real  
+
+Then remove the date column and make Year, Month, Day ones.  
+
+```{r}
+covr_sheet <- left_join(covr_sheet, dens_to_join) %>% 
+    left_join(hts_to_join)
+
+# add F_ columns
+covr_sheet[ , f_names] <- NA
+
+covr_sheet <- covr_sheet %>% 
+    mutate(Year = lubridate::year(Date),
+           Month = lubridate::month(Date),
+           Day = lubridate::mday(Date)) %>% 
+    relocate(c(Month, Day), .after = Year) %>% 
+    select(-Date)
+    
+```
+
+
+# Density sheet  
+
+Want to keep all the same rows, but only the density columns  
+
+Then remove the 'Density' prefix  
+
+```{r}
+dens_sheet <- covr_sheet %>% 
+    select(Reserve:Notes,
+           starts_with("Density_"))
+
+names(dens_sheet) <- str_remove(names(dens_sheet), "Density_")
+```
+
+
+
+# Heights sheet  
+
+Same for heights  
+
+```{r}
+hts_sheet <- covr_sheet %>% 
+    select(Reserve:Notes,
+           starts_with("Maximum Canopy Height_"))
+
+names(hts_sheet) <- str_remove(names(hts_sheet), "Maximum Canopy Height_")
+```
+
+
+# Compile workbook  
+
+```{r}
+out_path <- here::here("wrangled_data", "NMST", "CBM-MB_NMST.xlsx")
+write_xlsx(list(Station_Table = stn_tbl,
+                Species_Names = spp_names,
+                Cover = covr_sheet,
+                Density = dens_sheet,
+                Height = hts_sheet),
+           path = out_path,
+           format_headers = TRUE)
+```
+
 
