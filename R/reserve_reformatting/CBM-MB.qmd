@@ -90,6 +90,78 @@ names(covr_in)[33] <- "Unknown2"
 covr_in[,35:37] <- NULL
 ```
 
+## NA date issues  
+
+```{r}
+# covr_in %>% 
+#     filter(is.na(Date)) %>% 
+#     View()
+```
+
+Random row with nothing in it; remove based on Year being NA
+
+```{r}
+covr_in <- covr_in %>% 
+    filter(!is.na(Year))
+```
+
+As in CBM-OPC script, get rid of the 0s in these plots.  
+
+```{r}
+# date is NA. keep only columns that have an entry *somewhere*.
+NAdates <- covr_in %>% 
+    filter(is.na(Date)) %>% 
+    select(-Comments) %>% 
+    janitor::remove_empty("cols")
+
+# get the names of the species columns that need to change
+cols_to_change <- names(NAdates)[5:8]
+
+# index the rows that don't have any entries for the species and remove.
+# do rowSums on "not NAs" in the species columns and 
+# keep those which are greater than 0
+inds <- which(rowSums(!is.na(NAdates[5:ncol(NAdates)])) > 0)
+    
+to_investigate <- NAdates[inds, ]
+
+# and change
+rows_to_change <- covr_in %>% 
+    mutate(rownum = row_number()) %>% 
+    filter(Transect == "MCMST1",
+           Plot == "P3",
+           Year ==2015) %>% 
+    select(rownum) %>% 
+    unlist()
+
+covr_in[rows_to_change, cols_to_change] <- NA
+```
+
+
+
+Assign date based on sampling date for other plots in the transect, as in CBM-OPC script.  
+
+Some transects were sampled over multiple dates. I'm assigning the first date for each transect for simplicity (even though the actual sample date may have been one of the other days - these are plots that were not sampled).  
+
+```{r}
+transectDates <- covr_in %>% 
+    select(Transect, Year, Date) %>% 
+    distinct() %>% 
+    filter(!is.na(Date)) %>% 
+    rename(Date2 = Date)
+
+twoDates <- transectDates %>% 
+    select(Transect, Year) %>% 
+    duplicated()
+
+transectSingle <- transectDates[-which(twoDates == TRUE), ]
+
+covr_in <- left_join(covr_in, transectSingle) %>% 
+    mutate(Date = case_when(is.na(Date) ~ Date2,
+                            TRUE ~ Date)) %>% 
+    select(-Date2)
+```
+
+
 
 ## Density  
 
@@ -98,9 +170,16 @@ dens_in <- read_excel(file_in, sheet = "Stem Density", skip = 9)
 names(dens_in)[27] <- "Unknown1"
 names(dens_in)[28] <- "Unknown2"
 dens <- dens_in %>% 
-    janitor::remove_empty("cols")
+    janitor::remove_empty("cols") %>% 
+    relocate(Comments, .after = Date)
 ```
 
+```{r}
+# add Density_ prefix for joining in cover sheet
+dens_to_join <- dens 
+densNames <- paste("Density", names(dens), sep = "_")
+names(dens_to_join)[7:ncol(dens_to_join)] <- densNames[7:ncol(dens_to_join)]
+```
 
 ## Heights  
 
@@ -109,7 +188,16 @@ hts_in <- read_excel(file_in, sheet = "Max Height Data", skip = 9)
 names(hts_in)[27] <- "Unknown1"
 names(hts_in)[28] <- "Unknown2"
 hts <- hts_in %>% 
-    janitor::remove_empty("cols")
+    janitor::remove_empty("cols") %>% 
+    relocate(Comments, .after = Date)
+```
+
+```{r}
+# add Maximum Canopy Height_ prefix for joining in cover sheet
+hts_to_join <- hts
+htsNames <- paste("Maximum Canopy Height", names(hts), sep = "_")
+
+names(hts_to_join)[7:ncol(hts_to_join)] <- htsNames[7:ncol(hts_to_join)]
 ```
 
 ## Species List  
@@ -126,7 +214,7 @@ spp_covr <- spp_covr %>%
 
 spp_names <- spp_covr %>% 
     pivot_longer(everything(),
-                 names_to = "Species in column names",
+                 names_to = "Species",
                  values_to = "Common name")
 ```
 
