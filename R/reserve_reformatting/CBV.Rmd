@@ -220,6 +220,7 @@ stn_dupes <- dat_all %>%
 stn_dupes
 ```
 
+I think I won't let this bother me. Looks like they may have measured or estimated distance on each date rather than using one number consistently.
 
 ### Lat/Long discrepancies  
 
@@ -262,6 +263,17 @@ write.csv(spp, spp_out_path, row.names = FALSE)
 
 
 # Fix discrepancies  
+
+
+
+# HEIGHT STUFF  
+
+
+# LIVE AND DEAD SPECIES STUFF  
+
+also some capitalization (unvegetated cover, Unvegetated Cover) and/or consistency issues (wrack, Wrack, woody debris (wrack))
+
+
 
 
 ## Column wrangling  
