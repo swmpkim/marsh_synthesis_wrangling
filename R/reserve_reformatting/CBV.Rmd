@@ -142,7 +142,56 @@ dat_all %>%
 ```
 
 
-2013-09-17 GI T1 P12 IVAFRU duplicated. Counter rows 33 and 36. One for cover is "1-5" with canopy height as 23.0; other is "26-50" for cover and 230.0 for canopy height.
+2013-09-17 GI T1 P12 IVAFRU duplicated. Counter rows 33 and 36. One for cover is "1-5" with canopy height as 23.0; other is "26-50" for cover and 230.0 for canopy height.  
+
+Per Scott L. email on 1/11/23: "please remove Counter Row 106 (with IVAFRU at 26-50 percent cover).   I think that was entered erroneously."
+
+```{r}
+dat_all2 <- dat_all %>% 
+    filter(Counter != 106)
+
+ivafru_dupes <- dat_all %>%
+    mutate(rownum = row_number()) %>%
+    filter(lubridate::ymd(Date) == "2013-09-17",
+           SiteID == "GI",
+           TransectID == "T1",
+           PlotID == "P12",
+           Species == "IVAFRU") %>%
+    select(rownum, `% Cover`)
+
+# want to get rid of the second one
+dat_all <- dat_all %>%
+    filter(row_number() != ivafru_dupes$rownum[2])
+
+```
+
+## Distance column as text  
+
+Also there are some numbers that seem to be weirdly floating decimal points - round to tenths place.  
+
+```{r}
+dat_all <- dat_all %>% 
+    mutate(Distance = case_when(Distance == "60 ish" ~ "60",
+                                TRUE ~ Distance),
+           Distance = as.numeric(Distance),
+           Distance = round(Distance, 1))
+```
+
+## Elevation two columns  
+
+Combine into one and round to 4 digits (again, weirdly floating decimals here).  
+
+```{r}
+dat_all <- dat_all %>% 
+    mutate(`Elevation (NAVD88)` = case_when(`Elevation (NAVD88)` == "no data" ~ NA_character_,
+                                            TRUE ~ `Elevation (NAVD88)`),
+           `Elevation (NAVD88)` = as.numeric(`Elevation (NAVD88)`),
+           Elevation_NAVD88 = case_when(is.na(Elevation) ~ `Elevation (NAVD88)`,
+                                        !is.na(Elevation) ~ Elevation,
+                                        TRUE ~ NA_real_)) %>% 
+    select(-Elevation, -`Elevation (NAVD88)`)
+```
+
 
 
 ## Check station/plot names  
