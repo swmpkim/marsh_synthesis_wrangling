@@ -107,16 +107,19 @@ dat_all %>%
     filter(n > 1) %>%
     select(Year:Species, n)
 
-janitor::get_dupes(dat_all,
+TJR_dupes <- janitor::get_dupes(dat_all,
                    Year, Season, SiteID, TransectID, PlotID, Species,
-                   "Live/Dead") %>% 
-    View()
+                   "Live/Dead") 
+
+write_xlsx(TJR_dupes, here::here(problem_path_out, 
+                                 "TJR_dupes.xlsx"))
 ```
 
 
 ## Check station/plot names  
 
 ```{r}
+dat_all$Reserve <- "TJR"
 unique(dat_all$Reserve)
 ```
 
@@ -124,25 +127,29 @@ unique(dat_all$Reserve)
 dat_all %>% 
     select(Reserve, SiteID, TransectID, PlotID) %>% 
     distinct() %>% 
+    arrange(SiteID, TransectID, PlotID) %>% 
     knitr::kable()
 ```
 
 
 ### 'Distance' discrepancies  
 
-```{r}
-stn_dupes <- dat_all %>% 
-    select(Reserve, SiteID, TransectID, PlotID,
-           Distance) %>% 
-    distinct() %>% 
-    janitor::get_dupes(-Distance)
+no Distance column
 
-stn_dupes
+```{r}
+# stn_dupes <- dat_all %>% 
+#     select(Reserve, SiteID, TransectID, PlotID,
+#            Distance) %>% 
+#     distinct() %>% 
+#     janitor::get_dupes(-Distance)
+# 
+# stn_dupes
 ```
 
 
 ### Lat/Long discrepancies  
 
+no lat/long in data
 
 
 ## Mangroves or SAV present?  
@@ -160,9 +167,12 @@ sum(str_detect(spp_all, "Rhizo"))
 
 ```
 
+Species names all look okay!
+
 Also check for anything other than 'E' in 'Type'.
 
 ```{r}
+dat_all$Type <- "E"
 unique(dat_all$Type)
 ```
 
