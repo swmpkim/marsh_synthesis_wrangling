@@ -56,3 +56,28 @@ hts_wide <- hts %>%
                 values_from = SpaAlt)
 ```
 
+## for data request  
+
+### Plots  
+
+Assigning site names based on different locations in metadata - transects 1-3 are more southern, 4-6 are more northern.  
+
+"The biomonitoring study area, a component of the ACE Sentinel Site, is located at Edisto Island State Park, Edisto Island, SC (see map below). The study area is in the salt marshes along Big Bay Creek. Transects 1 thru 3 are in a marsh that is mainly characterized by smooth cordgrass (Spartina alterniflora) and glasswort (Salicornia virginica); while transects 4 thru 6 are in a marsh that is dominated by smooth cordgrass (Spartina alterniflora), with black needlerush (Juncus roemerianus) near the marsh-upland border."
+
+```{r}
+sites_etc <- pi_cov %>% 
+    select(PlotID) %>% 
+    filter(!is.na(PlotID)) %>% 
+    distinct() %>% 
+    separate(PlotID, into = c("TransectID", "PlotID"),
+             remove = TRUE) %>% 
+    mutate(SiteID = case_when(TransectID %in% c("T1", "T2", "T3") ~ "EI South",
+                              TRUE ~ "EI North")) %>% 
+    select(SiteID, TransectID, PlotID) %>% 
+    arrange(TransectID, SiteID, PlotID)
+
+write.csv(sites_etc, here::here("wrangled_data",
+                                "combined_with_issues",
+                                "ACE_plots.csv"))
+```
+
