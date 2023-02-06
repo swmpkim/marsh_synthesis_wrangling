@@ -254,6 +254,16 @@ janitor::get_dupes(dat_all, SiteID, TransectID, PlotID, Species, Date)
 
 CDMO column names, in order. If columns had different names, or there were additional ones, account for that here.    
 
+Need to create Density and Height columns.  
+
+```{r}
+dat_all$Density <- NA
+dat_all$Ht <- NA
+dat_all$Lat <- NA
+dat_all$Long <- NA
+```
+
+
 ```{r}
 dat_cdmo <- dat_all %>% 
     select(
@@ -266,8 +276,12 @@ dat_cdmo <- dat_all %>%
         "SiteID",
         "TransectID",
         "PlotID",
+        "Lat",
+        "Long",
         "Species",
-        "Cover"
+        "Cover",
+        "Density",
+        "Ht"
     )
 ```
 

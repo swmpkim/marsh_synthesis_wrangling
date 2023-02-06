@@ -59,7 +59,8 @@ In a Shiny app, let someone pick this interactively. Here, hard-code. Using MAR 
 # reserve <- "SOS"
 # reserve <- "HUD-PIER" # completed 12/20/22
 # reserve <- "HUD-TIV"  # completed 12/20/22
-reserve <- "JAC"  # completed 1/27/23
+# reserve <- "JAC"  # completed 1/27/23
+reserve <- "TJR"  # completed 2/6/23
 ```
 
 ```{r}
@@ -98,7 +99,7 @@ dat <- read_xlsx(path,
     mutate(Date = lubridate::ymd(paste(Year, Month, Day, sep = "-")))
 ```
 
-Add required columns if they don't exist. QAQC, SSAM-1, OrthoHt, HtMLLW.
+Add required columns if they don't exist. QAQC, SSAM-1, OrthoHt, HtMLLW, Distance.
 
 ```{r}
 if(!exists("QAQC", dat)){
@@ -115,6 +116,10 @@ if(!exists("Orthometric_Height", dat)){
 
 if(!exists("Height_Relative_to_MLLW", dat)){
   dat$Height_Relative_to_MLLW <- NA  
+}
+
+if(!exists("Distance", dat)){
+  dat$Distance <- NA  
 }
 ```
 
