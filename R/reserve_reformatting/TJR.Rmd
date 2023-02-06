@@ -192,20 +192,51 @@ write.csv(spp, spp_out_path, row.names = FALSE)
 
 # Fix discrepancies  
 
+## Dupes  
+
+Annotated spreadsheet says what to do.  
+
+```{r}
+dupe_fix <- read_xlsx(here::here("wrangled_data",
+                                 "combined_with_issues",
+                                 "TJR_dupes - with comments.xlsx"),
+                      n_max = 13)
+
+dat_all <- dat_all %>%
+    full_join(dupe_fix) %>% 
+    mutate(Species = case_when(!is.na(Fix_column) ~ Fix_column,
+                               TRUE ~ Species)) %>% 
+    filter(Species != "remove") %>% 
+    select(-dupe_count, -Fix_column)
+
+
+# double check for more dupes  
+janitor::get_dupes(dat_all, SiteID, TransectID, PlotID, Species, `Live/Dead`, `Season/Year`)
+```
+
+
 
 ## Column wrangling  
 
+### Dates  
+
 Pull out columns for Month, Day, and Year; and format Date as mm/dd/yyyy for the CDMO output file.  
+
+TJR had issues with date entry so cannot provide full information at this time. For Namaste project, because date itself doesn't really matter, we will use October 15th as Month-Day for all readings. Reserve will correct after-the-fact as they are able to find time.  
 
 ```{r}
 dat_all <- dat_all %>% 
     mutate(
-        Year = lubridate::year(Date),
-        Month = lubridate::month(Date),
-        Day = lubridate::mday(Date),
+        Month = 10,
+        Day = 15,
+        Date = lubridate::ymd(paste(Year, Month, Day, sep = "-")),
         Date = format(Date, "%m/%d/%Y")
     ) 
 ```
+
+### Live/Dead  
+
+
 
 
 
@@ -225,22 +256,8 @@ dat_cdmo <- dat_all %>%
         "SiteID",
         "TransectID",
         "PlotID",
-        "Subplot",
-        "Rep",
-        "SSAM-1",
-        "Lat",
-        "Long",
-        "Distance",
-        "Orthometric Height",
-        "Height Relative to MLLW",
         "Species",
-        "Cover",
-        "Density",
-        "Maximum Canopy Height",
-        "Average Canopy Height",
-        "Diameter",
-        "Height",
-        "QAQC"
+        "Cover"
     )
 ```
 
