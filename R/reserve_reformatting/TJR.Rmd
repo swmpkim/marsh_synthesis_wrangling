@@ -236,6 +236,16 @@ dat_all <- dat_all %>%
 
 ### Live/Dead  
 
+Only want to append to species name when veg was dead. If "live" or "NA", leave species as-is.  
+
+```{r}
+dat_all <- dat_all %>% 
+    mutate(Species = case_when(`Live/Dead` == "Dead" ~ paste0(Species, "_Dead"),
+                               TRUE ~ Species))
+
+# check for dupes  
+janitor::get_dupes(dat_all, SiteID, TransectID, PlotID, Species, Date)
+```
 
 
 
@@ -265,9 +275,9 @@ dat_cdmo <- dat_all %>%
 ## Write the CDMO data frame to a file. **Modify for each reserve**  
 
 ```{r}
-write.csv(dat_cdmo, here::here(problem_path_out, paste0(reserve, "_issues.csv")), 
-          row.names= FALSE,
-          na = "")
+# write.csv(dat_cdmo, here::here(problem_path_out, paste0(reserve, "_issues.csv")), 
+#           row.names= FALSE,
+#           na = "")
 ```
 
 ```{r}
