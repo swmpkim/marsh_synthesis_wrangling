@@ -1,0 +1,70 @@
+---
+title: "NMST file checks"
+format: html
+execute:
+  echo: false
+---
+```{r}
+library(tidyverse)
+library(readxl)
+library(glue)
+```
+
+
+UNLESS a warning message exists below the name of each file, the following checks have been performed successfully:   
+
+-  sheet names are correct, and in the correct order  
+-  all identifying column names exist in the Cover sheet (Reserve, SiteID, TransectID, PlotID, Year, Month, Day, Orthometric_Height, Height_Relative_to_MLLW, Distance)
+-  there aren't any duplicate rows of date-site-transect-plot  
+
+These have not yet been coded but will be:  
+
+-  species names match between sheets: names in density and height sheets should be subset of those on cover sheet  
+-  station table sheet contains all stations used in cover sheet  
+
+```{r}
+sht_names <- c("Station_Table", "Species_Names", "Cover", "Density", "Height")
+
+id_cols <- c("Reserve", "SiteID", 
+             "Year", "Month", "Day",
+             "TransectID", "PlotID", 
+             "Orthometric_Height", "Height_Relative_to_MLLW",
+             "Distance")
+
+stn_tbl_cols <- c("Reserve", "SiteID", 
+                  "TransectID", "PlotID", 
+                  "Lat", "Long", "Type",
+                  "Orthometric_Height", "Height_Relative_to_MLLW",
+                  "Distance", "SSAM-1")
+```
+
+
+## What are the files in the directory  
+
+```{r}
+path <- here::here("from_google_drive",
+                        "Namaste-ish straight out of R")
+fls <- list.files(path)
+fls2 <- paste0(path, "/", fls)
+
+print(fls)
+```
+
+
+
+## Run checks on each  
+
+```{r}
+for(i in seq_along(fls)){
+    # print some dividers
+    cat("\n----------------------- \n")
+    cat("----------------------- \n")
+    
+    # source script of checks  
+    try(
+        source(here::here("R", "sourced", "nmst-file-check-helper.R"))
+    )
+
+}
+```
+
