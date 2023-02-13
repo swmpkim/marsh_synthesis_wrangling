@@ -29,7 +29,7 @@ id_cols <- c("Reserve", "SiteID",
              "Year", "Month", "Day",
              "TransectID", "PlotID", 
              "Orthometric_Height", "Height_Relative_to_MLLW",
-             "Distance")
+             "Distance", "Notes")
 
 stn_tbl_cols <- c("Reserve", "SiteID", 
                   "TransectID", "PlotID", 
