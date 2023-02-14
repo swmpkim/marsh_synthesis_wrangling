@@ -103,7 +103,9 @@ for(i in seq_along(to_read)){
     dat_in[[i]] <- read_cdmo(here::here(path_start, to_read[i])) 
 }
 
-dat_all <- bind_rows(dat_in)
+dat_all <- bind_rows(dat_in) %>% 
+    rename(Orthometric_Height = `Orthometric Height`,
+           Height_Relative_to_MLLW = `Height Relative to MLLW`)
 ```
 
 
@@ -269,6 +271,9 @@ dat_cdmo <- dat_all %>%
         "Reserve",
         "Type",
         "Date",
+        "Year",
+        "Month",
+        "Day",
         "SiteID",
         "TransectID",
         "PlotID",
@@ -278,8 +283,8 @@ dat_cdmo <- dat_all %>%
         "Lat",
         "Long",
         "Distance",
-        "Orthometric Height",
-        "Height Relative to MLLW",
+        "Orthometric_Height",
+        "Height_Relative_to_MLLW",
         "Species",
         "Cover",
         "Density",
@@ -324,7 +329,7 @@ Date is character format, so it ought to be easy to pull out the indices and do 
 
 ```{r}
 # pull out column indices
-colsToFix <- which(names(dat_cdmo) %in% c("SSAM-1", "Lat", "Long", "Distance", "Orthometric Height", "Height Relative to MLLW"))
+colsToFix <- which(names(dat_cdmo) %in% c("SSAM-1", "Lat", "Long", "Distance", "Orthometric_Height", "Height_Relative_to_MLLW"))
 
 
 # FIRST IN THE LIST
@@ -552,9 +557,7 @@ Everything in this table is the first recorded value.
 
 
 ```{r}
-dat <- dat_cdmo %>% 
-    rename(Orthometric_Height = `Orthometric Height`,
-           Height_Relative_to_MLLW = `Height Relative to MLLW`)
+dat <- dat_cdmo 
 # there must be a better way to do this, but it works.
 
 stns <- dat %>% 
@@ -599,7 +602,7 @@ NMST_dupes <- covr_sheet_out %>%
     mutate(NMSTrownum = row_number()) %>% 
     janitor::get_dupes(Date, SiteID, TransectID, PlotID) %>% 
     relocate(NMSTrownum) %>% 
-    select(NMSTrownum:`Height Relative to MLLW`)
+    select(NMSTrownum:Height_Relative_to_MLLW)
 
 # View(NMST_dupes)
 ```

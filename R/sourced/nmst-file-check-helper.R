@@ -76,7 +76,8 @@ if(sum(!ht_check) > 0){
 
 
 ### now from the other worksheets  
-
+######################## make sure to get rid of numbers for reps
+##################################################################
 
 ## density
 dens <- read_xlsx(fls2[i],
