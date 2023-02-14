@@ -529,10 +529,14 @@ Join:
 
 ```{r}
 covr_sheet_out <- covr_wide %>% 
+    mutate(Notes = NA_character_) %>% 
     full_join(dens_to_join) %>% 
     full_join(ht_to_join) %>% 
     full_join(qaqc_to_join) %>% 
-    select(-`NA`, -Subplot, -F_NA)
+    relocate(Notes, .after = Height_Relative_to_MLLW) %>% 
+    select(-`NA`, -Subplot, -F_NA,
+           -Date, -Type, -`SSAM-1`,
+           -Lat, -Long, -Rep)
 
 # write_xlsx(covr_sheet_out, path = here::here("wrangled_data", "NMST", "NIW_NMSTish.xlsx"))
 ```
@@ -543,8 +547,14 @@ covr_sheet_out <- covr_wide %>%
 Density and Height sheets can be built from `dens_wide` and `ht_wide` but I'm worried rows won't 100% match the cover sheet.  
 
 ```{r}
-dens_sheet <- dens_wide
-hts_sheet <- ht_wide
+dens_sheet <- dens_wide %>% 
+    select(-c(Type, Date, `SSAM-1`, Rep, Lat, Long)) %>% 
+    mutate(Notes = NA_character_) %>% 
+    relocate(Notes, .after = Height_Relative_to_MLLW)
+hts_sheet <- ht_wide %>% 
+    select(-c(Type, Date, `SSAM-1`, Rep, Lat, Long)) %>% 
+    mutate(Notes = NA_character_) %>% 
+    relocate(Notes, .after = Height_Relative_to_MLLW)
 ```
 
 
@@ -600,7 +610,7 @@ spp_names <- dat %>%
 ```{r}
 NMST_dupes <- covr_sheet_out %>% 
     mutate(NMSTrownum = row_number()) %>% 
-    janitor::get_dupes(Date, SiteID, TransectID, PlotID) %>% 
+    janitor::get_dupes(Year, Month, Day, SiteID, TransectID, PlotID) %>% 
     relocate(NMSTrownum) %>% 
     select(NMSTrownum:Height_Relative_to_MLLW)
 
