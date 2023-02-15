@@ -192,6 +192,25 @@ dat_all <- dat_all %>%
     select(-Elevation, -`Elevation (NAVD88)`)
 ```
 
+## Change braun-blanquet category covers to midpoint  
+
+per TWG at January 2023 meeting  
+
+represented as % Cover in data frame, insert "Cover" column  
+
+```{r}
+dat_all <- dat_all %>% 
+    mutate(Cover = case_when(`% Cover` == "Trace" ~ 0.1,
+                             `% Cover` == "1-5" ~ 3,
+                             `% Cover` == "6-25" ~ 15,
+                             `% Cover` == "26-50" ~ 38,
+                             `% Cover` == "26-60" ~ 38, # assuming typo
+                             `% Cover` == "51-75" ~ 63,
+                             `% Cover` == "76-95" ~ 85,
+                             `% Cover` == "96-100" ~ 98,
+                             TRUE ~ 100))
+```
+
 
 
 ## Check station/plot names  
@@ -256,22 +275,33 @@ spp <- dat_all %>%
     group_by(Species) %>% 
     tally()
 
-spp_out_path <- here::here("wrangled_data", "combined_with_issues", paste0(reserve, "_species.csv")) 
-
-write.csv(spp, spp_out_path, row.names = FALSE)
+# spp_out_path <- here::here("wrangled_data", "combined_with_issues", paste0(reserve, "_species.csv")) 
+# 
+# write.csv(spp, spp_out_path, row.names = FALSE)
 ```
 
 
 # Fix discrepancies  
 
+Species  
+
+```{r}
+# read in updates  
+spp_fixed <- read_xlsx(here::here("wrangled_data",
+                                  "combined_with_issues",
+                                  "CBV_species_updates.xlsx")) %>% 
+    select(Species_to = Species,
+           Species = Species_Original)
+
+dat_all <- dat_all %>% 
+    full_join(spp_fixed) %>% 
+    select(-Species) %>% 
+    rename(Species = Species_to) 
+```
 
 
 # HEIGHT STUFF  
 
-
-# LIVE AND DEAD SPECIES STUFF  
-
-also some capitalization (unvegetated cover, Unvegetated Cover) and/or consistency issues (wrack, Wrack, woody debris (wrack)) - "species_updated" list has full latin names and consistency in others.  
 
 
 

@@ -93,7 +93,9 @@ spp_dens <- dens %>%
     filter(row_number() == 1) %>% 
     select(-(1:Notes),
            -starts_with("F_")) %>% 
-    names()
+    names() %>% 
+    str_remove("\\s\\d")
+
 dens_covr <- spp_dens %in% names(spp_covr)
 if(sum(!dens_covr) > 0){
     cli::cli_warn(c("Species with reported density measurements 
@@ -124,7 +126,8 @@ spp_hts <- hts %>%
     filter(row_number() == 1) %>% 
     select(-(1:Notes),
            -starts_with("F_")) %>% 
-    names()
+    names() %>% 
+    str_remove("\\s\\d")
 hts_covr <- spp_hts %in% names(spp_covr)
 if(sum(!hts_covr) > 0){
     cli::cli_warn(c("Species with reported height measurements 
