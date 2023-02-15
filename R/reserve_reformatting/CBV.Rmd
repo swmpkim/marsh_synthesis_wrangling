@@ -200,15 +200,17 @@ represented as % Cover in data frame, insert "Cover" column
 
 ```{r}
 dat_all <- dat_all %>% 
-    mutate(Cover = case_when(`% Cover` == "Trace" ~ 0.1,
-                             `% Cover` == "1-5" ~ 3,
-                             `% Cover` == "6-25" ~ 15,
-                             `% Cover` == "26-50" ~ 38,
-                             `% Cover` == "26-60" ~ 38, # assuming typo
-                             `% Cover` == "51-75" ~ 63,
-                             `% Cover` == "76-95" ~ 85,
-                             `% Cover` == "96-100" ~ 98,
-                             TRUE ~ 100))
+    mutate(Cover = case_match(`% Cover`,
+                              "Trace" ~ 0.1,
+                              "1-5" ~ 3,
+                              "6-25" ~ 15,
+                              "26-50" ~ 38,
+                              "26-60" ~ 38, # assuming typo
+                              "51-75" ~ 63,
+                              "76-95" ~ 85,
+                              "96-100" ~ 98))
+
+# case_match new in dplyr 1.1.0! Hooray!
 ```
 
 
@@ -302,8 +304,83 @@ dat_all <- dat_all %>%
 
 # HEIGHT STUFF  
 
+First deal with the text entries  
+
+```{r}
+# to_replace <- tribble(
+#     ~"entered", ~"change_to",
+#     "~120", "120",
+#     "~70-80", "75",
+#     "~80-90", "85",
+#     "n/a", NA_character_,
+#     "-", NA_character_,
+#     "NC", NA_character_
+# )
+
+dat_all <- dat_all %>% 
+    mutate(`Canopy Height 1` = case_match(`Canopy Height 1`,
+                                          "~120" ~ "120",
+                                          "~70-80" ~ "75",
+                                          "~80-90" ~ "85",
+                                          "n/a" ~ NA_character_,
+                                          "-" ~ NA_character_,
+                                          "NC" ~ NA_character_,
+                                          .default = `Canopy Height 1`),
+           `Canopy Height 2` = case_match(`Canopy Height 2`,
+                                          "~120" ~ "120",
+                                          "~70-80" ~ "75",
+                                          "~80-90" ~ "85",
+                                          "n/a" ~ NA_character_,
+                                          "-" ~ NA_character_,
+                                          "NC" ~ NA_character_,
+                                          .default = `Canopy Height 2`),
+           `Canopy Height 3` = case_match(`Canopy Height 3`,
+                                          "~120" ~ "120",
+                                          "~70-80" ~ "75",
+                                          "~80-90" ~ "85",
+                                          "n/a" ~ NA_character_,
+                                          "-" ~ NA_character_,
+                                          "NC" ~ NA_character_,
+                                          .default = `Canopy Height 3`))
+```
+
+## Function to deal with columns  
 
 
+-  separate heights with a slash into flowering and not-flowering height columns  
+-  if there wasn't a slash, the value was placed into the not-flowering height column  
+-  if there was an 'f' at the end of the value, that value was put into the flowering height column, and an NA was placed in the not-flowering height column  
+-  a 'to_average' column was generated, using not-flowering height if one was present, and flowering height otherwise  
+-  all the new columns were turned into numeric format  
+
+```{r}
+fl_cols <- function(df, col){
+    fl_name <- paste0("flowering_", col)
+    nfl_name <- paste0("NOT_flowering_", col)
+    avg_name <- paste0("toAverage_", col)
+    df %>%
+        separate({{col}}, into = c("f_ht", "NOTf_ht"), sep = "/",
+                 extra = "drop", fill = "left",
+                 remove = FALSE) %>% 
+        mutate(f_ht = ifelse(str_ends(NOTf_ht, "f"), str_remove(NOTf_ht, "f"), f_ht),
+               NOTf_ht = ifelse(str_ends(NOTf_ht, "f"), NA, NOTf_ht),
+               to_average = ifelse(!is.na(NOTf_ht), NOTf_ht, f_ht),
+               across(c(f_ht, NOTf_ht, to_average), as.numeric)) %>% 
+        relocate(to_average, .after = NOTf_ht) %>% 
+        rename(!!fl_name := f_ht,
+               !!nfl_name := NOTf_ht,
+               !!avg_name := to_average)
+}
+```
+
+### Apply the function  
+
+```{r}
+cbv_hts <- dat_all %>% 
+    fl_cols("Canopy Height 1") %>% 
+    fl_cols("Canopy Height 2") %>% 
+    fl_cols("Canopy Height 3")
+```
 
 
 ## Column wrangling  
