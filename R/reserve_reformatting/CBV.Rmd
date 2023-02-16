@@ -511,9 +511,9 @@ establ <- function(df, x){
             group_by(SiteID, TransectID, PlotID) %>% 
             filter(!is.na({{x}})) %>%
             filter(Date == min(Date)) %>% 
-            select(-Date)
+            select(-Date) 
     }
-        
+
     out
 }
 ```
@@ -823,3 +823,65 @@ hts_sheet <- hts_sheet %>%
     left_join(hts_big_wide)
 ```
 
+
+
+# Station Table  
+
+Everything in this table is the first recorded value.  
+
+
+```{r}
+# there must be a better way to do this, but it works.
+
+stns <- dat %>% 
+    select(Reserve, SiteID, TransectID, PlotID) %>% 
+    distinct() %>% 
+    arrange(SiteID, TransectID, PlotID)
+lats <- establ(dat, Lat) %>% 
+    group_by(SiteID, TransectID, PlotID) %>% 
+    summarize(Lat = mean(Lat))   # p13A had 2 values for the first date
+longs <- establ(dat, Long) %>% 
+    group_by(SiteID, TransectID, PlotID) %>% 
+    summarize(Long = mean(Long))   # p13A had 2 values for the first date
+ssam1 <- establ(dat, `SSAM-1`)
+dists <- establ(dat, Distance)
+orth_hts <- establ(dat, Orthometric_Height) 
+mllw_hts <- establ(dat, Height_Relative_to_MLLW)
+types <- establ(dat, Type)
+
+stn_tbl <- full_join(stns, lats) %>% 
+    full_join(longs) %>% 
+    full_join(types) %>% 
+    full_join(orth_hts) %>% 
+    full_join(mllw_hts) %>%
+    full_join(dists) %>% 
+    full_join(ssam1)
+
+```
+
+
+
+# Species List  
+
+```{r}
+spp_names <- dat %>% 
+    select(Species) %>% 
+    distinct() %>% 
+    arrange(Species)
+```
+
+
+
+
+# Write to Excel  
+
+```{r}
+out_path <- here::here("wrangled_data", "NMST", "CBV_NMST.xlsx")
+write_xlsx(list(Station_Table = stn_tbl,
+                Species_Names = spp_names,
+                Cover = covr_sheet,
+                Density = dens_sheet,
+                Height = hts_sheet),
+           path = out_path,
+           format_headers = TRUE)
+```
