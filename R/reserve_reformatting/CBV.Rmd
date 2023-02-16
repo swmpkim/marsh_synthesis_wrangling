@@ -376,10 +376,26 @@ fl_cols <- function(df, col){
 ### Apply the function  
 
 ```{r}
-cbv_hts <- dat_all %>% 
+dat_all <- dat_all %>% 
     fl_cols("Canopy Height 1") %>% 
     fl_cols("Canopy Height 2") %>% 
     fl_cols("Canopy Height 3")
+```
+
+
+### Average heights for Cover sheet  
+
+```{r}
+dat_all <- dat_all %>% 
+    rowwise() %>% 
+    mutate(`Maximum Canopy Height` = round(
+        mean(c(
+        `toAverage_Canopy Height 1`,
+        `toAverage_Canopy Height 2`,
+        `toAverage_Canopy Height 3`),
+        na.rm = TRUE),
+        2)
+        )
 ```
 
 
@@ -404,6 +420,10 @@ dat_all <- dat_all %>%
 CDMO column names, in order. If columns had different names, or there were additional ones, account for that here.    
 
 ```{r}
+dat_all$`SSAM-1` <- "Yes"
+dat_all$`Height Relative to MLLW` <- NA
+dat_all$QAQC <- NA
+
 dat_cdmo <- dat_all %>% 
     select(
         "Reserve",
@@ -421,15 +441,12 @@ dat_cdmo <- dat_all %>%
         "Lat",
         "Long",
         "Distance",
-        "Orthometric Height",
+        "Orthometric Height" = "Elevation_NAVD88",
         "Height Relative to MLLW",
         "Species",
         "Cover",
         "Density",
         "Maximum Canopy Height",
-        "Average Canopy Height",
-        "Diameter",
-        "Height",
         "QAQC"
     )
 ```
@@ -438,13 +455,13 @@ dat_cdmo <- dat_all %>%
 ## Write the CDMO data frame to a file. **Modify for each reserve**  
 
 ```{r}
-write.csv(dat_cdmo, here::here(problem_path_out, reserve, "_issues.csv"), 
-          row.names= FALSE,
-          na = "")
+# write.csv(dat_cdmo, here::here(problem_path_out, reserve, "_issues.csv"), 
+#           row.names= FALSE,
+#           na = "")
 ```
 
 ```{r}
-write_xlsx(dat_cdmo, path = here::here(path_out, reserve, "_CDMO.xlsx"),
+write_xlsx(dat_cdmo, path = here::here(path_out, "CBV_CDMO.xlsx"),
            format_headers = TRUE)
 ```
 
