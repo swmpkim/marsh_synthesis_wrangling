@@ -648,7 +648,10 @@ dens <- dat %>%
     pivot_wider(names_from = Species,
                 values_from = Density,
                 names_prefix = "Density_",
-                names_sort = TRUE)
+                names_sort = TRUE) 
+
+# apply(dens, MARGIN = 2, FUN = function(x) sum(!is.na(x))) 
+# no empty species columns 
 ```
 
 
@@ -662,6 +665,9 @@ hts <- dat %>%
                 values_from = Ht,
                 names_prefix = paste0(ht_type, "_"),
                 names_sort = TRUE)
+
+# apply(hts, MARGIN = 2, FUN = function(x) sum(!is.na(x))) 
+# no empty species columns 
 ```
 
 
@@ -697,4 +703,41 @@ if(mangroves > 0){
 }
 ```
 
+## Join them all  
+
+```{r}
+covr_sheet <- full_join(covr_wide, dens) %>% 
+    full_join(hts) %>% 
+    select(all_of(id_names), everything()) %>% 
+    relocate(Notes, .after = Distance) %>% 
+    relocate(starts_with("F_"), .after = last_col())
+
+# join in mangrove heights and diameters too
+if(mangroves > 0){
+    covr_sheet <- full_join(covr_sheet, dat_mang) %>% 
+        relocate(starts_with("F_"), .after = last_col())
+}
+```
+
+## If NA columns, remove  
+
+This can happen when reserves don't sample a site on a certain date, but they have a placeholder row in the data where species is blank. During pivoting, an 'NA' column is created. So is an 'F_NA' column.  
+
+```{r}
+if("NA" %in% names(covr_sheet)){
+    covr_sheet$"NA" <- NULL
+}
+
+if("F_NA" %in% names(covr_sheet)){
+    covr_sheet$"F_NA" <- NULL
+}
+```
+
+
+Check again for dupes  
+
+```{r}
+janitor::get_dupes(covr_sheet, Year, Month, Day,
+                   SiteID, TransectID, PlotID)
+```
 
