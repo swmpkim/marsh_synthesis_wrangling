@@ -30,6 +30,8 @@ pi_cov <- read_xlsx(here::here(path_start,
                                "ACE Basin biomonitoring data_11Aug2021_smu.xlsx"),
                     sheet = "PerCov_raw")
 
+# because ACE uses point-intercept with 50 points,
+# need to multiply raw data by 2 to get pct cover
 cov_summ <- pi_cov %>% 
     group_by(Date, PlotID) %>% 
     summarize(across(c(Sediment:Mussel, Bare),
@@ -79,5 +81,66 @@ sites_etc <- pi_cov %>%
 write.csv(sites_etc, here::here("wrangled_data",
                                 "combined_with_issues",
                                 "ACE_plots.csv"))
+```
+
+# Cover sheet  
+
+Changes made:  
+
++  insert species names rather than codes  
++  separate Transect and Plot  
++  assign SiteID based on transect  
++  separate date into ymd  
+
+Still need to:  
+  
++  insert all ID columns  
+
+```{r}
+covr <- cov_summ %>% 
+    rename("Spartina alterniflora" = SpaAlt,
+           "Salicornia virginica" = SalVir,
+           "Juncus roemarianus" = JunRoe) %>% 
+    separate(PlotID, into = c("TransectID", "PlotID"),
+             sep = "-") %>% 
+    mutate(SiteID = case_when(TransectID %in% c("T1", "T2", "T3") ~ "EI South",
+                              TRUE ~ "EI North"),
+           Year = lubridate::year(Date),
+           Month = lubridate::month(Date),
+           Day = lubridate::mday(Date)) %>% 
+    select(Date, Year, Month, Day,
+           SiteID, TransectID, PlotID,
+           everything())
+```
+
+
+# Height sheet  
+
+Do same things as to cover sheet. Also remove rows with no height measurements.  
+
+```{r}
+hts_wide <- hts_wide %>% 
+    separate(PlotID, into = c("TransectID", "PlotID"),
+             sep = "-") %>% 
+    mutate(SiteID = case_when(TransectID %in% c("T1", "T2", "T3") ~ "EI South",
+                              TRUE ~ "EI North"),
+           Year = lubridate::year(Date),
+           Month = lubridate::month(Date),
+           Day = lubridate::mday(Date)) %>% 
+    select(Date, Year, Month, Day,
+           SiteID, TransectID, PlotID,
+           everything()) %>% 
+    janitor::remove_empty("cols") %>% 
+    filter(!is.na(`Spartina alterniflora_1`))
+```
+
+Average heights for cover sheet  
+
+```{r}
+hts_avg <- hts_wide %>% 
+    rowwise() %>% 
+    mutate("Average Canopy Height_Spartina alterniflora" = round(mean(c_across(`Spartina alterniflora_1`:`Spartina alterniflora_12`), 
+                                                                      na.rm = TRUE), 
+                                                                 2))
 ```
 
