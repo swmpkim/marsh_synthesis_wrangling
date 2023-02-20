@@ -141,6 +141,13 @@ hts_avg <- hts_wide %>%
     rowwise() %>% 
     mutate("Average Canopy Height_Spartina alterniflora" = round(mean(c_across(`Spartina alterniflora_1`:`Spartina alterniflora_12`), 
                                                                       na.rm = TRUE), 
-                                                                 2))
+                                                                 2)) %>% 
+    ungroup()
+
+hts_to_join <- hts_avg %>% 
+    select(Year, Month, Day,
+           SiteID, TransectID, PlotID,
+           `Average Canopy Height_Spartina alterniflora`)
 ```
+
 
