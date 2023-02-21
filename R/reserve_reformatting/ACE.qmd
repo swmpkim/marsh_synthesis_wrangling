@@ -151,3 +151,44 @@ hts_to_join <- hts_avg %>%
 ```
 
 
+# Density sheet  
+
+will need FlDen_raw worksheet  
+
+```{r}
+dens <- read_xlsx(here::here(path_start, 
+                               "ACE Basin biomonitoring data_11Aug2021_smu.xlsx"),
+                    sheet = "FlDen_raw")
+
+# ignoring SubQuad to make a new Rep column; pivot longer to set up for pivoting wider
+dens_wide <- dens %>% 
+    rename(Date = SampDate...1,
+           "Spartina alterniflora" = SpaAlt,
+           "Salicornia virginica" = SalVir,
+           "Juncus roemarianus" = JunRoe) %>% 
+    group_by(Date, PlotID) %>% 
+    mutate(Rep = 1:n()) %>% 
+    pivot_longer(`Spartina alterniflora`:OtherVeg,
+                 names_to = "Species",
+                 values_to = "Value") %>% 
+    select(Date, PlotID, Rep, Species, Value) %>% 
+    pivot_wider(names_from = c(Species, Rep),
+                names_sep = "_",
+                values_from = Value) %>% 
+    select(Date, PlotID,
+           starts_with("Spartina"),
+           starts_with("Salicornia"),
+           starts_with("Juncus"),
+           starts_with("Other")) %>% 
+    separate(PlotID, into = c("TransectID", "PlotID"),
+             sep = "-") %>% 
+    mutate(SiteID = case_when(TransectID %in% c("T1", "T2", "T3") ~ "EI South",
+                              TRUE ~ "EI North"),
+           Year = lubridate::year(Date),
+           Month = lubridate::month(Date),
+           Day = lubridate::mday(Date)) %>% 
+    select(Date, Year, Month, Day,
+           SiteID, TransectID, PlotID,
+           everything())
+```
+
