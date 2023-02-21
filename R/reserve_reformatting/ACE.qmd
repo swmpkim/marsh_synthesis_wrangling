@@ -217,3 +217,38 @@ dens_to_join <- dens_wide %>%
 
 ```
 
+
+# Cover sheet - joins  
+
+
+
+## Create F_ columns for Cover sheet  
+
+Don't actually add them yet because we want them behind the density and height columns, but these are the names.
+
+```{r}
+spps_in_covr <- names(covr)[8:ncol(covr)]
+f_names <- paste("F", spps_in_covr, sep = "_")
+```
+
+```{r}
+covr_sheet <- left_join(covr, dens_to_join) %>% 
+    left_join(hts_to_join) %>% 
+    ungroup() %>% 
+    select(-Date)
+
+# add F_ columns
+covr_sheet[ , f_names] <- NA
+
+```
+
+Need to add in additional ID columns and Notes, but cover, density, and height columns are all here.  
+
+
+```{r}
+# check for dupes
+janitor::get_dupes(covr_sheet, Year, Month, Day, SiteID, TransectID, PlotID)
+```
+
+
+Dens and Hts sheets both have fewer rows than cover sheet; make sure to get all the same rows in all sheets  
