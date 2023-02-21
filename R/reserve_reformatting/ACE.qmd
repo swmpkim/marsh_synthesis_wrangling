@@ -100,7 +100,7 @@ Still need to:
 covr <- cov_summ %>% 
     rename("Spartina alterniflora" = SpaAlt,
            "Salicornia virginica" = SalVir,
-           "Juncus roemarianus" = JunRoe) %>% 
+           "Juncus roemerianus" = JunRoe) %>% 
     separate(PlotID, into = c("TransectID", "PlotID"),
              sep = "-") %>% 
     mutate(SiteID = case_when(TransectID %in% c("T1", "T2", "T3") ~ "EI South",
@@ -165,7 +165,7 @@ dens_wide <- dens %>%
     rename(Date = SampDate...1,
            "Spartina alterniflora" = SpaAlt,
            "Salicornia virginica" = SalVir,
-           "Juncus roemarianus" = JunRoe) %>% 
+           "Juncus roemerianus" = JunRoe) %>% 
     group_by(Date, PlotID) %>% 
     mutate(Rep = 1:n()) %>% 
     pivot_longer(`Spartina alterniflora`:OtherVeg,
@@ -190,5 +190,30 @@ dens_wide <- dens %>%
     select(Date, Year, Month, Day,
            SiteID, TransectID, PlotID,
            everything())
+```
+
+
+## Averaging for joining to cover sheet  
+
+```{r}
+dens_to_join <- dens_wide %>% 
+    pivot_longer(-c(Date:PlotID),
+                 names_to = c("Species", "Rep"),
+                 names_sep = "_",
+                 values_to = "Density") %>% 
+    filter(!is.na(Density)) %>% 
+    group_by(Year, Month, Day, 
+             SiteID, TransectID, PlotID,
+             Species) %>% 
+    summarize(mean = round(mean(Density), 2)) %>% 
+    pivot_wider(names_from = Species,
+                names_prefix = "Density_",
+                values_from = mean) %>% 
+    select(Year:PlotID,
+           "Density_Spartina alterniflora",
+           "Density_Salicornia virginica",
+           "Density_Juncus roemerianus",
+           everything())
+
 ```
 
