@@ -31,7 +31,7 @@ if(sum(!(col_chk)) > 0){
 
 # check for duplicate rows  
 janitor::get_dupes(covr,
-                   Year, Month, Day, SiteID, TransectID, PlotID)
+                   Year, SiteID, TransectID, PlotID)
 
 
 # species name checks  
