@@ -6,6 +6,7 @@ format: html
 ```{r}
 library(tidyverse)
 library(readxl)
+library(writexl)
 reserve <- "ACE"
 ```
 
@@ -30,6 +31,16 @@ pi_cov <- read_xlsx(here::here(path_start,
                                "ACE Basin biomonitoring data_11Aug2021_smu.xlsx"),
                     sheet = "PerCov_raw")
 
+# have to fix an erroneous date: in 2014, T4-01's first point was labelled 10/21/2014 rather than 10/22/2014.  
+pi_to_fix <- pi_cov %>% 
+    mutate(rownum = row_number()) %>% 
+    filter(as.character(Date) == "2014-10-21",
+           PlotID == "T4-01") %>% 
+    select(rownum)
+pi_to_fix <- unlist(pi_to_fix)
+
+pi_cov$Date[pi_to_fix] <- as.Date("2014-10-22")
+
 # because ACE uses point-intercept with 50 points,
 # need to multiply raw data by 2 to get pct cover
 cov_summ <- pi_cov %>% 
@@ -46,7 +57,24 @@ cov_summ <- pi_cov %>%
 hts <- read_xlsx(here::here(path_start, 
                                "ACE Basin biomonitoring data_11Aug2021_smu.xlsx"),
                     sheet = "SpHt_raw")
+```
 
+
+When joining heights to cover sheet, discovered that T6-05 in 2019 was labelled as 2018. "10/23/2018" should be "10/23/2019" for this plot. Fixing here.  
+
+```{r}
+# find that one  
+row_to_fix <- hts %>% 
+    mutate(rownum = row_number()) %>% 
+    filter(as.character(Date) == "2018-10-23",
+                    PlotID == "T6-05") %>% 
+    select(rownum)
+row_to_fix <- unlist(row_to_fix)
+
+hts[row_to_fix, "Date"] <- as.Date("2019-10-23")
+```
+
+```{r}
 # ignoring SubQuad to make a new plant num column, then pivot wider
 hts_wide <- hts %>% 
     group_by(Date, PlotID) %>% 
@@ -55,8 +83,13 @@ hts_wide <- hts %>%
     select(Date, PlotID, PlantNum2, SpaAlt) %>% 
     pivot_wider(names_from = PlantNum2,
                 names_prefix = "Spartina alterniflora_",
-                values_from = SpaAlt)
+                values_from = SpaAlt) %>% 
+    ungroup()
 ```
+
+
+
+
 
 ## for data request  
 
@@ -129,7 +162,8 @@ hts_wide <- hts_wide %>%
            Day = lubridate::mday(Date)) %>% 
     select(Date, Year, Month, Day,
            SiteID, TransectID, PlotID,
-           everything()) %>% 
+           everything()) %>%
+    select(-Date) %>% 
     janitor::remove_empty("cols") %>% 
     filter(!is.na(`Spartina alterniflora_1`))
 ```
@@ -189,7 +223,9 @@ dens_wide <- dens %>%
            Day = lubridate::mday(Date)) %>% 
     select(Date, Year, Month, Day,
            SiteID, TransectID, PlotID,
-           everything())
+           everything()) %>% 
+    ungroup() %>% 
+    select(-Date)
 ```
 
 
@@ -197,7 +233,7 @@ dens_wide <- dens %>%
 
 ```{r}
 dens_to_join <- dens_wide %>% 
-    pivot_longer(-c(Date:PlotID),
+    pivot_longer(-c(Year:PlotID),
                  names_to = c("Species", "Rep"),
                  names_sep = "_",
                  values_to = "Density") %>% 
@@ -244,7 +280,7 @@ covr_sheet[ , f_names] <- NA
 
 ```
 
-Need to add in additional ID columns and Notes, but cover, density, and height columns are all here.  
+Need to add in additional ID columns and Notes, but cover, density, and height columns are all here. Will join those in after generating the station table, because lat, long, and elevation are there.   
 
 
 ```{r}
@@ -276,11 +312,89 @@ stn_tbl <- read_xlsx(here::here(path_start, "Plot Elevations.xlsx")) %>%
 ```
 
 
+# Additions to Cover sheet  
+
+```{r}
+stn_to_join <- stn_tbl %>% 
+    select(SiteID, TransectID, PlotID,
+           Orthometric_Height,
+           Height_Relative_to_MLLW,
+           Distance)
+
+
+covr_sheet <- covr_sheet %>% 
+    left_join(stn_to_join) %>% 
+    mutate(Reserve = "ACE") %>% 
+    select(Reserve, SiteID, TransectID, PlotID,
+           Year, Month, Day,
+           Orthometric_Height,
+           Height_Relative_to_MLLW,
+           Distance,
+           everything()) %>% 
+    filter(!is.na(PlotID))
+```
+
+
+Capture comments from pi_cov data frame.  
+
+```{r}
+notes <- pi_cov %>% 
+    filter(!is.na(Comments)) %>% 
+    separate(PlotID, into = c("TransectID", "PlotID"),
+             remove = TRUE) %>% 
+    mutate(SiteID = case_when(TransectID %in% c("T1", "T2", "T3") ~ "EI South",
+                              TRUE ~ "EI North"),
+           Year = lubridate::year(Date),
+           Month = lubridate::month(Date),
+           Day = lubridate::mday(Date))
+
+
+c_notes <- notes %>% 
+    group_by(SiteID, Year, Month, Day, TransectID, PlotID) %>% 
+    summarize(Notes = str_c(unique(Comments), collapse = "; "))
+```
+
+
+Join those in as notes.  
+
+```{r}
+covr_sheet <- left_join(covr_sheet, c_notes) %>% 
+    relocate(Notes, .after = Distance)
+```
+
+
+# Modify Density and Height sheets  
+
+The Density sheet has a date of 10/31/2017 for T6 Plots 1, 2, and 3. Date for that transect everywhere else is 10/30. This seems to have happened with heights too. I will ignore it by joining only on Year and Month, rather than Year-Month-Day.  
+
+
+```{r}
+dens_sheet <- covr_sheet %>% 
+    select(Reserve:Notes) %>% 
+    full_join(select(dens_wide, -Day))
+
+hts_sheet <- covr_sheet %>% 
+    select(Reserve:Notes) %>% 
+    left_join(select(hts_wide, -Day))
+
+# anti_join(hts_wide, covr_sheet) %>% View()
+```
+
+NOTE: there were height measurements present (30 rows) for July of 2013. Because there were not corresponding cover measurements, I excluded them from the NMST file.  
+
+One last check for dupes.
+
+This check led to finding that Date for T4-01 Point 1 in 2014 was labelled 10/21/2014 instead of 10/22/2014. Fixed above.  
+
+```{r}
+janitor::get_dupes(covr_sheet, SiteID, TransectID, PlotID, Year)
+```
+
 
 # Compile workbook  
 
 ```{r}
-out_path <- here::here("wrangled_data", "NMST", "CBM-OPC_NMST.xlsx")
+out_path <- here::here("wrangled_data", "NMST", "ACE_NMST.xlsx")
 write_xlsx(list(Station_Table = stn_tbl,
                 Species_Names = spp_names,
                 Cover = covr_sheet,
