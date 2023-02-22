@@ -139,7 +139,7 @@ Average heights for cover sheet
 ```{r}
 hts_avg <- hts_wide %>% 
     rowwise() %>% 
-    mutate("Average Canopy Height_Spartina alterniflora" = round(mean(c_across(`Spartina alterniflora_1`:`Spartina alterniflora_12`), 
+    mutate("Maximum Canopy Height_Spartina alterniflora" = round(mean(c_across(`Spartina alterniflora_1`:`Spartina alterniflora_12`), 
                                                                       na.rm = TRUE), 
                                                                  2)) %>% 
     ungroup()
@@ -147,7 +147,7 @@ hts_avg <- hts_wide %>%
 hts_to_join <- hts_avg %>% 
     select(Year, Month, Day,
            SiteID, TransectID, PlotID,
-           `Average Canopy Height_Spartina alterniflora`)
+           `Maximum Canopy Height_Spartina alterniflora`)
 ```
 
 
@@ -229,6 +229,8 @@ Don't actually add them yet because we want them behind the density and height c
 ```{r}
 spps_in_covr <- names(covr)[8:ncol(covr)]
 f_names <- paste("F", spps_in_covr, sep = "_")
+
+spp_names <- data.frame("Species" = spps_in_covr)
 ```
 
 ```{r}
@@ -252,3 +254,38 @@ janitor::get_dupes(covr_sheet, Year, Month, Day, SiteID, TransectID, PlotID)
 
 
 Dens and Hts sheets both have fewer rows than cover sheet; make sure to get all the same rows in all sheets  
+
+
+# Station Table tab  
+
+Lat, Long, and Elevation are in a different worksheet.  
+
+```{r}
+stn_tbl <- read_xlsx(here::here(path_start, "Plot Elevations.xlsx")) %>% 
+    separate(ID, into = c("Reserve", "TransectID", "PlotID"), sep = "_") %>% 
+    mutate(SiteID = case_when(TransectID %in% c("T1", "T2", "T3") ~ "EI South",
+                              TRUE ~ "EI North"),
+           PlotID = as.character(paste0("0", PlotID)),
+           Type = "E",
+           Height_Relative_to_MLLW = NA,
+           Distance = NA,
+           "SSAM-1" = "Yes") %>% 
+    rename(Orthometric_Height = "Elevation (m)") %>% 
+    select(Reserve, SiteID, TransectID, PlotID, Lat, Long, Type, Orthometric_Height, everything())
+    
+```
+
+
+
+# Compile workbook  
+
+```{r}
+out_path <- here::here("wrangled_data", "NMST", "CBM-OPC_NMST.xlsx")
+write_xlsx(list(Station_Table = stn_tbl,
+                Species_Names = spp_names,
+                Cover = covr_sheet,
+                Density = dens_sheet,
+                Height = hts_sheet),
+           path = out_path,
+           format_headers = TRUE)
+```
