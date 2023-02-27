@@ -305,11 +305,6 @@ covr_sheet <- full_join(covr_wide, dens) %>%
     relocate(Notes, .after = Distance) %>% 
     relocate(starts_with("F_"), .after = last_col())
 
-# join in mangrove heights and diameters too
-if(mangroves > 0){
-    covr_sheet <- full_join(covr_sheet, dat_mang) %>% 
-        relocate(starts_with("F_"), .after = last_col())
-}
 ```
 
 ## If NA columns, remove  
@@ -336,91 +331,11 @@ janitor::get_dupes(covr_sheet, Year, Month, Day,
 
 
 
-# Density sheet  
-
-Subset from covr_sheet to ensure equal number of rows between sheets  
-
-```{r}
-dens_sheet <- covr_sheet %>% 
-    select(all_of(id_names), Notes,
-           starts_with("Density_"))
-
-# get the 'Density' prefix out of the names
-names(dens_sheet) <- str_replace(names(dens_sheet), "^(Density_)", "")
-```
-
-
-
-# Height sheet  
-
-Subset from covr_sheet to ensure equal number of rows between sheets  
-
-But add all the columns back in from dat_all...... shoot, how? dat_all has a row per species...... hmmmm
-
-```{r}
-hts_sheet <- covr_sheet %>% 
-    select(all_of(id_names), Notes,
-           starts_with(as.character(ht_type)))
-
-# get the 'Height' prefix out of the names
-# will start with either Maximum or Average Canopy Height
-names(hts_sheet) <- str_replace(names(hts_sheet), "^([MAa-z]+ Canopy Height_)", "")
-```
-
-Pivot longer to set up a join with dat_all
-
-```{r}
-hts_long <- hts_sheet %>% 
-    pivot_longer(-id_names,
-                 names_to = "Species",
-                 values_to = "value")
-```
-
-subset dat_all for the join  
-
-```{r}
-hts_big <- dat_all %>% 
-    mutate(Date = lubridate::mdy(Date),
-           Year = lubridate::year(Date),
-           Month = lubridate::month(Date),
-           Day = lubridate::mday(Date)) %>% 
-    filter(!is.na(`Canopy Height 1`)) %>% 
-    select(Year, Month, Day, 
-           SiteID, TransectID, PlotID,
-           Species,
-           `Canopy Height 1`:`toAverage_Canopy Height 3`,
-           `Maximum Canopy Height`) 
-
-hts_big_long <- hts_big %>% 
-    mutate(across(`Canopy Height 1`:`Maximum Canopy Height`, as.character)) %>% 
-    pivot_longer(`Canopy Height 1`:`Maximum Canopy Height`,
-                 names_to = "Height",
-                 values_to = "Value") %>% 
-    mutate(Height = str_replace_all(Height, "_", " "))
-
-hts_big_wide <- hts_big_long %>% 
-    filter(!(Height %in% c("Canopy Height 1",
-                           "Canopy Height 2",
-                           "Canopy Height 3",
-                           "Maximum Canopy Height"))) %>% 
-    pivot_wider(names_from = c(Species, Height),
-                names_sep = "_",
-                values_from = Value)
-```
-
-Join  
-
-```{r}
-hts_sheet <- hts_sheet %>% 
-    select(Reserve:Notes) %>% 
-    left_join(hts_big_wide)
-```
-
-
-
 # Station Table  
 
 Everything in this table is the first recorded value.  
+
+# DEFINITELY NEED TO MODIFY THIS    
 
 
 ```{r}
@@ -468,13 +383,15 @@ spp_names <- dat %>%
 
 # Write to Excel  
 
+# Compile workbook  
+
 ```{r}
-out_path <- here::here("wrangled_data", "NMST", "CBV_NMST.xlsx")
+out_path <- here::here("wrangled_data", "NMST", "ELK_NMST.xlsx")
 write_xlsx(list(Station_Table = stn_tbl,
                 Species_Names = spp_names,
-                Cover = covr_sheet,
-                Density = dens_sheet,
-                Height = hts_sheet),
+                Cover = covr,
+                Density = dens,
+                Height = hts),
            path = out_path,
            format_headers = TRUE)
 ```
