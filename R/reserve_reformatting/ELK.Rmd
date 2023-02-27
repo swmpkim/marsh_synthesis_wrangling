@@ -1,0 +1,907 @@
+---
+title: "ELK"
+output: html_document
+date: "2023-02-27"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(readxl)
+library(writexl)
+library(leaflet)
+library(rgdal)
+library(stringi)  # for stri_sub_replace()
+
+reserve <- "ELK"
+```
+
+# Setup  
+
+## Helpful functions  
+
+Because I'll be doing this repetitively on similar data files....  
+
+```{r}
+source(here::here("R", "sourced", "00_helper_functions.R"))
+```
+
+## Data path  
+
+Just one file to read here.  
+
+
+
+```{r}
+# path_start <- here::here("submitted_data", "data", reserve, 
+#                          "CBNERRVA Veg Data GI Reserve for Chris Peter.xlsx")
+
+path_start <- here::here("submitted_data", "data", reserve)
+
+problem_path_out <- here::here("wrangled_data", "combined_with_issues")
+
+path_out <- here::here("wrangled_data", "CDMO")
+
+# create the output folder if it doesn't already exist
+if(!dir.exists(path_out)){
+    dir.create(path_out)
+}
+```
+
+
+Read into a list and combine  **MODIFY FOR DIFFERENT DATA TYPES**  
+
+# CDMO formatted input  
+
+This section will compile code to read in and combine files that are already in CDMO format. Then a long CDMO-format file will be generated, after reconciling column names, dates, and putting things in order. The NaMaSTe template file will be generated from the CDMO-format file.  
+
+```{r}
+dat <- read_xlsx(here::here(path_start, "Transects_Compiled.xlsx"), 
+                 sheet = "quads compiled")
+```
+
+Per Kerstin in 'Elk spp' file (in response to Jan/Feb 2023 data request): "we separate succulent and woody because former is more responsive to short-term changes, but you don't need to bother - delete juicy/woody and just use the overall one"   
+
+Looks like lat and long are switched, for 2016, 2018, and part of 2021. May have to do with certain sites?? Okay, yes, looks like Hester is the only site with *correct* lat/long (e.g. lat around 36, not -121)
+
+```{r}
+dat <- dat %>% 
+    select(-Juicy_Pickleweed,
+           -Woody_Pickleweed,
+           -High_Marsh,
+           -Category,
+           -(Marsh_Cover:Burrow_Density),  # keep Pickleweed_Height
+           -(Pickleweed_Biomass_Index:Seaward_Pickleweed_Elevation))
+```
+
+
+## Fix lat/longs  
+
+```{r}
+dat <- dat %>% 
+    mutate(Lat = case_when(Site == "Hester" ~ Latitude,
+                           .default = Longitude),
+           Long = case_when(Site == "Hester" ~ Longitude,
+                            .default = Latitude)) %>% 
+    relocate(Lat, .after = Latitude) %>% 
+    relocate(Long, .after = Longitude) %>% 
+    select(-Latitude, -Longitude)
+```
+
+
+
+## Latin names  
+
+```{r}
+spps <- read_xlsx(here::here(path_start, "ELK spp.xlsx"),
+                  col_names = c("Species_from", "Species_to", "native", "comments")) %>% 
+    mutate(Species_to = case_when(is.na(Species_to) ~ Species_from,
+                                  .default = Species_to))
+
+dat_names <- tibble("current" = names(dat)) %>% 
+    left_join(spps, by = c("current" = "Species_from")) %>% 
+    mutate(new = case_when(!is.na(Species_to) ~ Species_to,
+                           .default = current))
+
+names(dat) <- dat_names$new
+```
+
+
+
+# Checks  
+
+## Column names and types?  
+
+Look for different column names for the same thing.  
+
+```{r}
+names(dat_all)
+```
+
+Deal with the dual density columns  
+
+```{r}
+names(dat_all)[18] <- "Quad_count"
+names(dat_all)[19] <- "Density"
+```
+
+
+
+## Duplicates in date-site-transect-plot-species  
+
+Include subplot if used by reserve. Want an empty tibble below.    
+
+```{r}
+unique(dat_all$Subplot)
+
+# # subplot included
+# dat_all %>% 
+#    group_by(Date, SiteID, TransectID, PlotID, Subplot, Species) %>% 
+#     tally() %>% 
+#     filter(n > 1) %>% 
+#     select(Date:Species, n)
+
+# no subplot included
+dat_all %>%
+   group_by(Date, SiteID, TransectID, PlotID,  Species) %>%
+    tally() %>%
+    filter(n > 1) %>%
+    select(Date:Species, n)
+
+# just one dupe: 
+
+# dat_all %>%
+#     filter(SiteID == "GI",
+#            TransectID == "T1",
+#            PlotID == "P12",
+#            Species == "IVAFRU") %>% 
+#     View()
+```
+
+
+2013-09-17 GI T1 P12 IVAFRU duplicated. Counter rows 33 and 36. One for cover is "1-5" with canopy height as 23.0; other is "26-50" for cover and 230.0 for canopy height.  
+
+Per Scott L. email on 1/11/23: "please remove Counter Row 106 (with IVAFRU at 26-50 percent cover).   I think that was entered erroneously."
+
+```{r}
+dat_all2 <- dat_all %>% 
+    filter(Counter != 106)
+
+ivafru_dupes <- dat_all %>%
+    mutate(rownum = row_number()) %>%
+    filter(lubridate::ymd(Date) == "2013-09-17",
+           SiteID == "GI",
+           TransectID == "T1",
+           PlotID == "P12",
+           Species == "IVAFRU") %>%
+    select(rownum, `% Cover`)
+
+# want to get rid of the second one
+dat_all <- dat_all %>%
+    filter(row_number() != ivafru_dupes$rownum[2])
+
+```
+
+## Distance column as text  
+
+Also there are some numbers that seem to be weirdly floating decimal points - round to tenths place.  
+
+```{r}
+dat_all <- dat_all %>% 
+    mutate(Distance = case_when(Distance == "60 ish" ~ "60",
+                                TRUE ~ Distance),
+           Distance = as.numeric(Distance),
+           Distance = round(Distance, 1))
+```
+
+## Elevation two columns  
+
+Combine into one and round to 4 digits (again, weirdly floating decimals here).  
+
+```{r}
+dat_all <- dat_all %>% 
+    mutate(`Elevation (NAVD88)` = case_when(`Elevation (NAVD88)` == "no data" ~ NA_character_,
+                                            TRUE ~ `Elevation (NAVD88)`),
+           `Elevation (NAVD88)` = as.numeric(`Elevation (NAVD88)`),
+           Elevation_NAVD88 = case_when(is.na(Elevation) ~ `Elevation (NAVD88)`,
+                                        !is.na(Elevation) ~ Elevation,
+                                        TRUE ~ NA_real_)) %>% 
+    select(-Elevation, -`Elevation (NAVD88)`)
+```
+
+## Change braun-blanquet category covers to midpoint  
+
+per TWG at January 2023 meeting  
+
+represented as % Cover in data frame, insert "Cover" column  
+
+```{r}
+dat_all <- dat_all %>% 
+    mutate(Cover = case_match(`% Cover`,
+                              "Trace" ~ 0.1,
+                              "1-5" ~ 3,
+                              "6-25" ~ 15,
+                              "26-50" ~ 38,
+                              "26-60" ~ 38, # assuming typo
+                              "51-75" ~ 63,
+                              "76-95" ~ 85,
+                              "96-100" ~ 98))
+
+# case_match new in dplyr 1.1.0! Hooray!
+```
+
+
+
+## Check station/plot names  
+
+```{r}
+unique(dat_all$Reserve)
+```
+
+```{r}
+dat_all %>% 
+    select(Reserve, SiteID, TransectID, PlotID) %>% 
+    distinct() %>% 
+    knitr::kable()
+```
+
+
+### 'Distance' discrepancies  
+
+```{r}
+stn_dupes <- dat_all %>% 
+    select(Reserve, SiteID, TransectID, PlotID,
+           Distance) %>% 
+    distinct() %>% 
+    janitor::get_dupes(-Distance)
+
+stn_dupes
+```
+
+I think I won't let this bother me. Looks like they may have measured or estimated distance on each date rather than using one number consistently.  
+
+UPDATE 2/16/23 - this messed with pivoting, so am fixing some that didn't match within a date.  
+
+```{r}
+dat_all <- dat_all %>% 
+    mutate(Year = lubridate::year(Date),
+           Distance = case_when(Year == 2010 & TransectID == "T1" & PlotID == "P8" ~ 36,
+                                Year == 2010 & TransectID == "T1" & PlotID == "P9" ~ 41,
+                                Year == 2020 & TransectID == "T1" & PlotID == "P18" ~ 141,
+                                .default = Distance))
+```
+
+
+### Lat/Long discrepancies  
+
+
+
+## Mangroves or SAV present?  
+
+Mangrove species are: *Avicennia germinans*, *Laguncularia racemosa*, *Rhizophora mangle*. Check for these before discarding a `Height` or `Diameter` column.   
+
+The following sums will be 0 if none of the genus names were found in the species column. This is only set to detect the first few letteres in case of misspellings, so if any sums are above 0, it deserves further investigation.  
+
+```{r}
+spp_all <- sort(unique(dat_all$Species))
+knitr::kable(spp_all)
+sum(str_detect(spp_all, "Avic"))
+sum(str_detect(spp_all, "Lagunc"))
+sum(str_detect(spp_all, "Rhizo"))
+
+```
+
+Also check for anything other than 'E' in 'Type'.
+
+```{r}
+unique(dat_all$Type)
+```
+
+## Check species names  
+
+```{r}
+dat_all$Species <- str_replace(dat_all$Species, pattern = "  ", replacement = " ")
+    
+spp <- dat_all %>% 
+    group_by(Species) %>% 
+    tally()
+
+# spp_out_path <- here::here("wrangled_data", "combined_with_issues", paste0(reserve, "_species.csv")) 
+# 
+# write.csv(spp, spp_out_path, row.names = FALSE)
+```
+
+
+# Fix discrepancies  
+
+Species  
+
+```{r}
+# read in updates  
+spp_fixed <- read_xlsx(here::here("wrangled_data",
+                                  "combined_with_issues",
+                                  "CBV_species_updates.xlsx")) %>% 
+    select(Species_to = Species,
+           Species = Species_Original)
+
+dat_all <- dat_all %>% 
+    full_join(spp_fixed) %>% 
+    select(-Species) %>% 
+    rename(Species = Species_to) 
+```
+
+
+# HEIGHT STUFF  
+
+First deal with the text entries  
+
+```{r}
+# to_replace <- tribble(
+#     ~"entered", ~"change_to",
+#     "~120", "120",
+#     "~70-80", "75",
+#     "~80-90", "85",
+#     "n/a", NA_character_,
+#     "-", NA_character_,
+#     "NC", NA_character_
+# )
+
+dat_all <- dat_all %>% 
+    mutate(`Canopy Height 1` = case_match(`Canopy Height 1`,
+                                          "~120" ~ "120",
+                                          "~70-80" ~ "75",
+                                          "~80-90" ~ "85",
+                                          "n/a" ~ NA_character_,
+                                          "-" ~ NA_character_,
+                                          "NC" ~ NA_character_,
+                                          .default = `Canopy Height 1`),
+           `Canopy Height 2` = case_match(`Canopy Height 2`,
+                                          "~120" ~ "120",
+                                          "~70-80" ~ "75",
+                                          "~80-90" ~ "85",
+                                          "n/a" ~ NA_character_,
+                                          "-" ~ NA_character_,
+                                          "NC" ~ NA_character_,
+                                          .default = `Canopy Height 2`),
+           `Canopy Height 3` = case_match(`Canopy Height 3`,
+                                          "~120" ~ "120",
+                                          "~70-80" ~ "75",
+                                          "~80-90" ~ "85",
+                                          "n/a" ~ NA_character_,
+                                          "-" ~ NA_character_,
+                                          "NC" ~ NA_character_,
+                                          .default = `Canopy Height 3`))
+```
+
+## Function to deal with columns  
+
+
+-  separate heights with a slash into flowering and not-flowering height columns  
+-  if there wasn't a slash, the value was placed into the not-flowering height column  
+-  if there was an 'f' at the end of the value, that value was put into the flowering height column, and an NA was placed in the not-flowering height column  
+-  a 'to_average' column was generated, using not-flowering height if one was present, and flowering height otherwise  
+-  all the new columns were turned into numeric format  
+
+```{r}
+fl_cols <- function(df, col){
+    fl_name <- paste0("flowering_", col)
+    nfl_name <- paste0("NOT_flowering_", col)
+    avg_name <- paste0("toAverage_", col)
+    df %>%
+        separate({{col}}, into = c("f_ht", "NOTf_ht"), sep = "/",
+                 extra = "drop", fill = "left",
+                 remove = FALSE) %>% 
+        mutate(f_ht = ifelse(str_ends(NOTf_ht, "f"), str_remove(NOTf_ht, "f"), f_ht),
+               NOTf_ht = ifelse(str_ends(NOTf_ht, "f"), NA, NOTf_ht),
+               to_average = ifelse(!is.na(NOTf_ht), NOTf_ht, f_ht),
+               across(c(f_ht, NOTf_ht, to_average), as.numeric)) %>% 
+        relocate(to_average, .after = NOTf_ht) %>% 
+        rename(!!fl_name := f_ht,
+               !!nfl_name := NOTf_ht,
+               !!avg_name := to_average)
+}
+```
+
+### Apply the function  
+
+```{r}
+dat_all <- dat_all %>% 
+    fl_cols("Canopy Height 1") %>% 
+    fl_cols("Canopy Height 2") %>% 
+    fl_cols("Canopy Height 3")
+```
+
+
+### Average heights for CDMO and Cover sheet  
+
+```{r}
+dat_all <- dat_all %>% 
+    rowwise() %>% 
+    mutate(`Maximum Canopy Height` = round(
+        mean(c(
+        `toAverage_Canopy Height 1`,
+        `toAverage_Canopy Height 2`,
+        `toAverage_Canopy Height 3`),
+        na.rm = TRUE),
+        2)
+        )
+```
+
+
+## Column wrangling  
+
+Pull out columns for Month, Day, and Year; and format Date as mm/dd/yyyy for the CDMO output file.  
+
+```{r}
+dat_all <- dat_all %>% 
+    mutate(
+        Year = lubridate::year(Date),
+        Month = lubridate::month(Date),
+        Day = lubridate::mday(Date),
+        Date = format(Date, "%m/%d/%Y")
+    ) 
+```
+
+
+
+## CDMO format (long)  
+
+CDMO column names, in order. If columns had different names, or there were additional ones, account for that here.    
+
+```{r}
+dat_all$`SSAM-1` <- "Yes"
+dat_all$`Height Relative to MLLW` <- NA
+dat_all$QAQC <- NA
+
+dat_cdmo <- dat_all %>% 
+    select(
+        "Reserve",
+        "Type",
+        "Date",
+        "Year",
+        "Month",
+        "Day",
+        "SiteID",
+        "TransectID",
+        "PlotID",
+        "Subplot",
+        "Rep",
+        "SSAM-1",
+        "Lat",
+        "Long",
+        "Distance",
+        "Orthometric Height" = "Elevation_NAVD88",
+        "Height Relative to MLLW",
+        "Species",
+        "Cover",
+        "Density",
+        "Maximum Canopy Height",
+        "QAQC"
+    )
+```
+
+
+## Write the CDMO data frame to a file. **Modify for each reserve**  
+
+```{r}
+# write.csv(dat_cdmo, here::here(problem_path_out, reserve, "_issues.csv"), 
+#           row.names= FALSE,
+#           na = "")
+```
+
+```{r}
+write_xlsx(dat_cdmo, path = here::here(path_out, "CBV_CDMO.xlsx"),
+           format_headers = TRUE)
+```
+
+
+# NaMaSTe format  
+
+Same script because of all the height reps to capture into the Height worksheet. Will do a lot of copying from the template though.    
+
+Get rid of everything but dat_all and dat_cdmo.  
+
+```{r}
+to_rm <- ls()
+rm(list = c(to_rm[!(to_rm %in% c("dat_all", "dat_cdmo"))]),
+   to_rm)
+
+reserve <- "CBV"
+```
+
+
+```{r}
+# function to pick first non-NA reading for any given plot ("at establishment")
+establ <- function(df, x){
+    
+    x_vec <- df %>% 
+        select({{x}})
+    
+    if(sum(!is.na(x_vec)) == 0){
+        out <- df %>% 
+            select(SiteID, TransectID, PlotID, {{x}}) %>% 
+            distinct() 
+    } else {
+        out <- df %>% 
+            select(Date, SiteID, TransectID, PlotID, {{x}}) %>% 
+            distinct() %>% 
+            group_by(SiteID, TransectID, PlotID) %>% 
+            filter(!is.na({{x}})) %>%
+            filter(Date == min(Date)) %>% 
+            select(-Date) 
+    }
+
+    out
+}
+```
+
+Renaming possibilities:  
+
+```{r}
+col_matching <- c("Orthometric_Height" = "Orthometric Height",
+                  "Height_Relative_to_MLLW" = "Height Relative to MLLW",
+                  "Ht" = "Canopy Height",
+                  "Ht" = "Average Canopy Height",
+                  "Ht" = "Maximum Canopy Height")
+
+# deal with different types of canopy height measurement
+res_info <- read_xlsx(here::here("Reserve_Info.xlsx"))
+ht_type <- "Maximum Canopy Height"
+```
+
+Read in data and rename:  
+
+This assumes there are year, month, and day columns in the CDMO-formatted files. SO PUT THEM THERE, SELF.  
+
+```{r}
+dat <- dat_cdmo %>% 
+    rename(any_of(col_matching)) %>% 
+    filter(!is.na(Year)) %>% 
+    mutate(Date = lubridate::ymd(paste(Year, Month, Day, sep = "-")))
+```
+
+Add required columns if they don't exist. QAQC, SSAM-1, OrthoHt, HtMLLW, Distance.
+
+```{r}
+if(!exists("QAQC", dat)){
+  dat$QAQC <- NA  
+}
+
+if(!exists("SSAM-1", dat)){
+  dat$`SSAM-1` <- NA  
+}
+
+if(!exists("Orthometric_Height", dat)){
+  dat$Orthometric_Height <- NA  
+}
+
+if(!exists("Height_Relative_to_MLLW", dat)){
+  dat$Height_Relative_to_MLLW <- NA  
+}
+
+if(!exists("Distance", dat)){
+  dat$Distance <- NA  
+}
+```
+
+## Deal with notes separately  
+
+```{r}
+dat$Notes <- dat_all$Notes
+
+if(exists("Notes", dat)){
+    notes <- dat %>% 
+        filter(!is.na(Notes))
+    c_notes <- notes %>% 
+        group_by(SiteID, Year, Month, Day, TransectID, PlotID) %>% 
+        summarize(Notes = str_c(unique(Notes), collapse = "; "))
+} else {
+    c_notes <- dat %>% 
+        group_by(SiteID, Year, Month, Day, TransectID, PlotID) %>% 
+        summarize(Notes = NA_character_)
+}
+
+dat$Notes <- NULL
+dat <- left_join(dat, c_notes)
+```
+
+## Identifiers  
+
+Should be the same between all sheets  
+
+```{r}
+id_names <- c("Reserve", "SiteID", 
+             "Year", "Month", "Day",
+             "TransectID", "PlotID",
+             "Orthometric_Height", "Height_Relative_to_MLLW",
+             "Distance", "Notes")
+
+# only use ID columns that exist in the data frame
+id_names <- id_names[which(id_names %in% names(dat))]
+```
+
+
+
+# Cover sheet  
+
+NOTE this sheet also has average canopy height and density. Replicates are on the other sheets.  
+
+## Cover data  
+
+```{r}
+covr <- dat %>% 
+    select(all_of(id_names), Species, Cover, QAQC)
+
+# make sure there aren't any dupes  
+janitor::get_dupes(covr, -Cover)
+```
+
+```{r}
+# pivot
+covr_wide <- covr %>% 
+    rename("F" = QAQC) %>% 
+    pivot_wider(names_from = Species,
+                values_from = c(Cover, "F"),
+                names_sort = TRUE)
+
+# get the 'Cover' prefix out of the names
+names(covr_wide) <- str_replace(names(covr_wide), "^(Cover_)", "")
+```
+
+
+```{r}
+# check for dupes
+dupes <- janitor::get_dupes(covr_wide, Year, Month, Day, SiteID, TransectID, PlotID)
+```
+
+
+
+## Density data  
+
+```{r}
+dens <- dat %>% 
+    select(all_of(id_names), Species, Density) %>% 
+    filter(!is.na(Density)) %>% 
+    pivot_wider(names_from = Species,
+                values_from = Density,
+                names_prefix = "Density_",
+                names_sort = TRUE) 
+
+# apply(dens, MARGIN = 2, FUN = function(x) sum(!is.na(x))) 
+# no empty species columns 
+```
+
+
+## Height data  
+
+```{r}
+hts <- dat %>% 
+    select(all_of(id_names), Species, Ht) %>% 
+    filter(!is.na(Ht)) %>% 
+    pivot_wider(names_from = Species,
+                values_from = Ht,
+                names_prefix = paste0(ht_type, "_"),
+                names_sort = TRUE)
+
+# apply(hts, MARGIN = 2, FUN = function(x) sum(!is.na(x))) 
+# no empty species columns 
+```
+
+
+## Mangrove height and diameter  
+
+if applicable.  
+
+```{r}
+spp_all <- sort(unique(dat$Species))
+
+# are mangroves present in the species list
+mangroves <- sum(str_detect(spp_all, "Avic")) + sum(str_detect(spp_all, "Lagunc")) + sum(str_detect(spp_all, "Rhizo"))
+
+# what are those species
+mang_spp <- spp_all[str_which(spp_all, "Avic")]
+
+if(mangroves > 0){
+    dat_mang_ht <- dat %>% 
+        filter(Species %in% mang_spp) %>% 
+        select(all_of(id_names), Species, Height) %>% 
+        pivot_wider(names_from = Species,
+                values_from = Height,  # Height in original dataset is mangrove height
+                names_prefix = "Height_")
+    
+    dat_mang_diam <- dat %>% 
+        filter(Species %in% mang_spp) %>% 
+        select(all_of(id_names), Species, Diameter) %>% 
+        pivot_wider(names_from = Species,
+                values_from = Diameter,  # Height in original dataset is mangrove height
+                names_prefix = "Diameter_")
+    
+    dat_mang <- full_join(dat_mang_ht, dat_mang_diam)
+}
+```
+
+## Join them all  
+
+```{r}
+covr_sheet <- full_join(covr_wide, dens) %>% 
+    full_join(hts) %>% 
+    select(all_of(id_names), everything()) %>% 
+    relocate(Notes, .after = Distance) %>% 
+    relocate(starts_with("F_"), .after = last_col())
+
+# join in mangrove heights and diameters too
+if(mangroves > 0){
+    covr_sheet <- full_join(covr_sheet, dat_mang) %>% 
+        relocate(starts_with("F_"), .after = last_col())
+}
+```
+
+## If NA columns, remove  
+
+This can happen when reserves don't sample a site on a certain date, but they have a placeholder row in the data where species is blank. During pivoting, an 'NA' column is created. So is an 'F_NA' column.  
+
+```{r}
+if("NA" %in% names(covr_sheet)){
+    covr_sheet$"NA" <- NULL
+}
+
+if("F_NA" %in% names(covr_sheet)){
+    covr_sheet$"F_NA" <- NULL
+}
+```
+
+
+Check again for dupes  
+
+```{r}
+janitor::get_dupes(covr_sheet, Year, Month, Day,
+                   SiteID, TransectID, PlotID)
+```
+
+
+
+# Density sheet  
+
+Subset from covr_sheet to ensure equal number of rows between sheets  
+
+```{r}
+dens_sheet <- covr_sheet %>% 
+    select(all_of(id_names), Notes,
+           starts_with("Density_"))
+
+# get the 'Density' prefix out of the names
+names(dens_sheet) <- str_replace(names(dens_sheet), "^(Density_)", "")
+```
+
+
+
+# Height sheet  
+
+Subset from covr_sheet to ensure equal number of rows between sheets  
+
+But add all the columns back in from dat_all...... shoot, how? dat_all has a row per species...... hmmmm
+
+```{r}
+hts_sheet <- covr_sheet %>% 
+    select(all_of(id_names), Notes,
+           starts_with(as.character(ht_type)))
+
+# get the 'Height' prefix out of the names
+# will start with either Maximum or Average Canopy Height
+names(hts_sheet) <- str_replace(names(hts_sheet), "^([MAa-z]+ Canopy Height_)", "")
+```
+
+Pivot longer to set up a join with dat_all
+
+```{r}
+hts_long <- hts_sheet %>% 
+    pivot_longer(-id_names,
+                 names_to = "Species",
+                 values_to = "value")
+```
+
+subset dat_all for the join  
+
+```{r}
+hts_big <- dat_all %>% 
+    mutate(Date = lubridate::mdy(Date),
+           Year = lubridate::year(Date),
+           Month = lubridate::month(Date),
+           Day = lubridate::mday(Date)) %>% 
+    filter(!is.na(`Canopy Height 1`)) %>% 
+    select(Year, Month, Day, 
+           SiteID, TransectID, PlotID,
+           Species,
+           `Canopy Height 1`:`toAverage_Canopy Height 3`,
+           `Maximum Canopy Height`) 
+
+hts_big_long <- hts_big %>% 
+    mutate(across(`Canopy Height 1`:`Maximum Canopy Height`, as.character)) %>% 
+    pivot_longer(`Canopy Height 1`:`Maximum Canopy Height`,
+                 names_to = "Height",
+                 values_to = "Value") %>% 
+    mutate(Height = str_replace_all(Height, "_", " "))
+
+hts_big_wide <- hts_big_long %>% 
+    filter(!(Height %in% c("Canopy Height 1",
+                           "Canopy Height 2",
+                           "Canopy Height 3",
+                           "Maximum Canopy Height"))) %>% 
+    pivot_wider(names_from = c(Species, Height),
+                names_sep = "_",
+                values_from = Value)
+```
+
+Join  
+
+```{r}
+hts_sheet <- hts_sheet %>% 
+    select(Reserve:Notes) %>% 
+    left_join(hts_big_wide)
+```
+
+
+
+# Station Table  
+
+Everything in this table is the first recorded value.  
+
+
+```{r}
+# there must be a better way to do this, but it works.
+
+stns <- dat %>% 
+    select(Reserve, SiteID, TransectID, PlotID) %>% 
+    distinct() %>% 
+    arrange(SiteID, TransectID, PlotID)
+lats <- establ(dat, Lat) %>% 
+    group_by(SiteID, TransectID, PlotID) %>% 
+    summarize(Lat = mean(Lat))   # p13A had 2 values for the first date
+longs <- establ(dat, Long) %>% 
+    group_by(SiteID, TransectID, PlotID) %>% 
+    summarize(Long = mean(Long))   # p13A had 2 values for the first date
+ssam1 <- establ(dat, `SSAM-1`)
+dists <- establ(dat, Distance)
+orth_hts <- establ(dat, Orthometric_Height) 
+mllw_hts <- establ(dat, Height_Relative_to_MLLW)
+types <- establ(dat, Type)
+
+stn_tbl <- full_join(stns, lats) %>% 
+    full_join(longs) %>% 
+    full_join(types) %>% 
+    full_join(orth_hts) %>% 
+    full_join(mllw_hts) %>%
+    full_join(dists) %>% 
+    full_join(ssam1)
+
+```
+
+
+
+# Species List  
+
+```{r}
+spp_names <- dat %>% 
+    select(Species) %>% 
+    distinct() %>% 
+    arrange(Species)
+```
+
+
+
+
+# Write to Excel  
+
+```{r}
+out_path <- here::here("wrangled_data", "NMST", "CBV_NMST.xlsx")
+write_xlsx(list(Station_Table = stn_tbl,
+                Species_Names = spp_names,
+                Cover = covr_sheet,
+                Density = dens_sheet,
+                Height = hts_sheet),
+           path = out_path,
+           format_headers = TRUE)
+```
