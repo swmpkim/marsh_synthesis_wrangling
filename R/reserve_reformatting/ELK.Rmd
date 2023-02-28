@@ -54,9 +54,7 @@ if(!dir.exists(path_out)){
 
 Read into a list and combine  **MODIFY FOR DIFFERENT DATA TYPES**  
 
-# CDMO formatted input  
-
-This section will compile code to read in and combine files that are already in CDMO format. Then a long CDMO-format file will be generated, after reconciling column names, dates, and putting things in order. The NaMaSTe template file will be generated from the CDMO-format file.  
+# Read in  
 
 ```{r}
 dat <- read_xlsx(here::here(path_start, "Transects_Compiled.xlsx"), 
@@ -125,7 +123,9 @@ dat_all <- dat %>%
            Month = lubridate::month(Date),
            Day = lubridate::mday(Date),
            TransectID = case_when(is.na(TransectID) ~ 1,
-                                  .default = TransectID)) %>% 
+                                  .default = TransectID),
+           Height_Relative_to_MLLW = NA_real_,
+           Notes = NA_character_,) %>% 
     select(-Date) %>% 
     select(Reserve, 
            Year, Month, Day,
@@ -197,6 +197,7 @@ establ <- function(df, x){
             distinct() 
     } else {
         out <- df %>% 
+            mutate(Date = lubridate::mdy(paste(Month, Day, Year))) %>% 
             select(Date, SiteID, TransectID, PlotID, {{x}}) %>% 
             distinct() %>% 
             group_by(SiteID, TransectID, PlotID) %>% 
@@ -247,8 +248,14 @@ Start. Doesn't have elevations or some of the required columns.
 ```{r}
 stn_tbl <- dat_all %>% 
     select(Reserve, SiteID, TransectID,
-           PlotID, Lat, Long, Distance_along_transect) %>% 
-    distinct()
+           PlotID, Lat, Long, Height_Relative_to_MLLW,
+           Distance_along_transect, Notes) %>%
+    distinct() %>% 
+    mutate(Type = "E",
+           "SSAM-1" = case_when(SiteID == "Hester" ~ "No",
+                                .default = "Yes")) %>% 
+    relocate(Type, .after = Long) %>% 
+    relocate("SSAM-1", .before = Notes)
 ```
 
 
@@ -296,27 +303,17 @@ hts <- dat_all %>%
 ```
 
 
-## Join them all  
-
-```{r}
-covr_sheet <- full_join(covr_wide, dens) %>% 
-    full_join(hts) %>% 
-    select(all_of(id_names), everything()) %>% 
-    relocate(Notes, .after = Distance) %>% 
-    relocate(starts_with("F_"), .after = last_col())
-
-```
 
 ## If NA columns, remove  
 
 This can happen when reserves don't sample a site on a certain date, but they have a placeholder row in the data where species is blank. During pivoting, an 'NA' column is created. So is an 'F_NA' column.  
 
 ```{r}
-if("NA" %in% names(covr_sheet)){
+if("NA" %in% names(covr)){
     covr_sheet$"NA" <- NULL
 }
 
-if("F_NA" %in% names(covr_sheet)){
+if("F_NA" %in% names(covr)){
     covr_sheet$"F_NA" <- NULL
 }
 ```
@@ -325,7 +322,7 @@ if("F_NA" %in% names(covr_sheet)){
 Check again for dupes  
 
 ```{r}
-janitor::get_dupes(covr_sheet, Year, Month, Day,
+janitor::get_dupes(covr, Year, Month, Day,
                    SiteID, TransectID, PlotID)
 ```
 
@@ -333,37 +330,15 @@ janitor::get_dupes(covr_sheet, Year, Month, Day,
 
 # Station Table  
 
-Everything in this table is the first recorded value.  
-
-# DEFINITELY NEED TO MODIFY THIS    
+Everything was consistent throughout sheet except orthometric height; need to add this.  
+ 
 
 
 ```{r}
-# there must be a better way to do this, but it works.
+orth_hts <- establ(dat_all, Orthometric_Height) 
 
-stns <- dat %>% 
-    select(Reserve, SiteID, TransectID, PlotID) %>% 
-    distinct() %>% 
-    arrange(SiteID, TransectID, PlotID)
-lats <- establ(dat, Lat) %>% 
-    group_by(SiteID, TransectID, PlotID) %>% 
-    summarize(Lat = mean(Lat))   # p13A had 2 values for the first date
-longs <- establ(dat, Long) %>% 
-    group_by(SiteID, TransectID, PlotID) %>% 
-    summarize(Long = mean(Long))   # p13A had 2 values for the first date
-ssam1 <- establ(dat, `SSAM-1`)
-dists <- establ(dat, Distance)
-orth_hts <- establ(dat, Orthometric_Height) 
-mllw_hts <- establ(dat, Height_Relative_to_MLLW)
-types <- establ(dat, Type)
-
-stn_tbl <- full_join(stns, lats) %>% 
-    full_join(longs) %>% 
-    full_join(types) %>% 
-    full_join(orth_hts) %>% 
-    full_join(mllw_hts) %>%
-    full_join(dists) %>% 
-    full_join(ssam1)
+stn_tbl <- left_join(stn_tbl, orth_hts) %>% 
+    relocate(Orthometric_Height, .before = Height_Relative_to_MLLW)
 
 ```
 
@@ -372,9 +347,12 @@ stn_tbl <- full_join(stns, lats) %>%
 # Species List  
 
 ```{r}
-spp_names <- dat %>% 
-    select(Species) %>% 
+spp_names <- spps %>%
+    filter(!(Species_from %in% c("Juicy_Pickleweed", "Woody_Pickleweed"))) %>% 
     distinct() %>% 
+    select(Species = Species_to,
+           Common_Name = Species_from,
+           Native_Status = native) %>% 
     arrange(Species)
 ```
 
