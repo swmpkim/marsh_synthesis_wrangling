@@ -406,10 +406,12 @@ stn_tbl <- full_join(stns, lats) %>%
     full_join(orth_hts) %>% 
     full_join(mllw_hts) %>%
     full_join(dists) %>% 
-    full_join(ssam1)
+    full_join(ssam1) %>% 
+    arrange(SiteID, TransectID, PlotID)
 
 ```
 
+Some DM sites don't have associated lat/long/elevation data. There were several sites with PlotID listed as NA; wonder if these belong to the missing plot numbers?  
 
 
 # Species List  
