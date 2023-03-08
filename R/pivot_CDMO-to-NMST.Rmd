@@ -46,9 +46,9 @@ In a Shiny app, let someone pick this interactively. Here, hard-code. Using MAR 
 ```{r}
 # reserve <- "APA"  # contains Average and Maximum Canopy Height
 # reserve <- "CBM-JB"  # updated 8/19/22
-# reserve <- "GND"  # updated 8/19/22; updated 1/13/23
+reserve <- "GND"  # updated 8/19/22; updated 1/13/23; updated 3/8/23
 # reserve <- "KAC"  # updated 8/19/22
-reserve <- "LKS"  # updated 8/19/22; again 3/8/23
+# reserve <- "LKS"  # updated 8/19/22; again 3/8/23
 # reserve <- "MAR"  # completed 6/17/22
 # reserve <- "NOC-MI"  # completed 6/17/22
 # reserve <- "NOC-RC"  # completed 6/17/22

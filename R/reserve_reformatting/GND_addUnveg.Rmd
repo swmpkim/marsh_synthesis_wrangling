@@ -1,0 +1,62 @@
+---
+title: "GND unveg"
+output: html_document
+date: "2023-03-08"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+GND doesn't have explicitly identified "unvegetated" covers. Adding them here, as 100 - (sum of identified covers). Seems easiest to do this from the Namaste formatted file. Will then add to the CDMO file.  
+
+
+```{r}
+library(tidyverse)
+library(readxl)
+library(writexl)
+```
+
+
+```{r}
+dat <- read_xlsx(here::here("wrangled_data", 
+                            "combined_with_issues",
+                            "GND_CDMO_SiteIssues.xlsx"),
+                 na = c("", "NA")) 
+```
+
+Generate data for unvegetateds....  
+
+```{r}
+Totals <- dat %>% 
+    group_by(SiteID, TransectID, PlotID, Year, Month, Day) %>% 
+    summarize(TotalCover = sum(Cover)) %>% 
+    ungroup()
+
+Unvegs <- Totals %>% 
+    mutate(Unvegetated = 100 - TotalCover,
+           Unvegetated = case_when(Unvegetated < 0 ~ 0,
+                                   .default = Unvegetated))
+
+to_join <- dat %>% 
+    select(Reserve:`Height Relative to MLLW`) %>% 
+    distinct() %>% 
+    full_join(Unvegs) %>% 
+    select(-TotalCover) %>% 
+    mutate(Species = "Unvegetated") %>% 
+    rename(Cover = Unvegetated)
+
+dat <- bind_rows(dat, to_join) %>% 
+    arrange(Year, Month, Day, SiteID, TransectID, PlotID, Species) %>% 
+    mutate(Date = format(Date, "%m/%d/%Y"))
+```
+
+Re-write CDMO file:  
+
+```{r}
+write_xlsx(dat, here::here("wrangled_data",
+                           "CDMO",
+                           "GND_CDMO.xlsx"),
+           format_headers = TRUE)
+```
+
