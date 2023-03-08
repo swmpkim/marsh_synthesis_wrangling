@@ -20,6 +20,7 @@ UNLESS a warning message exists below the name of each file, the following check
 
 These have not yet been coded but will be:  
 -  station table sheet contains all stations used in cover sheet  
+-  no columns are named "NA" or "F_NA" (this happened occasionally when Reserves would have a blank for Species on dates that a plot was not read)  
 
 ```{r}
 sht_names <- c("Station_Table", "Species_Names", "Cover", "Density", "Height")

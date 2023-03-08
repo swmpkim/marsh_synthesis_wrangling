@@ -1,7 +1,7 @@
 ---
 title: "LKS"
 author: "Kim Cressman"
-date: "2022-05-25; latest update 2022-06-10"
+date: "2022-05-25; latest update 2023-03-08"
 output: 
     html_document:
         toc: true
@@ -47,7 +47,7 @@ Also create an output folder for each reserve in the `wrangled data` folder and 
 path_start <- here::here("submitted_data", "data", "LKS",
                          "LKS NERR VegMonitoring 2014-2020_PROVISIONAL.xlsx")
 problem_path_out <- here::here("wrangled_data", "combined_with_issues")
-path_out <- here::here("wrangled_data", "LKS")
+path_out <- here::here("wrangled_data", "CDMO")
 
 # create the output folder if it doesn't already exist
 if(!dir.exists(path_out)){
@@ -118,23 +118,17 @@ unique(dat_all$Subplot)
 #     select(Date:Species, n)
 
 # no subplot included
-dat_all %>%
-   group_by(Date, SiteID, TransectID, PlotID,  Species) %>%
-    tally() %>%
-    filter(n > 1) %>%
-    select(Date:Species, n)
+janitor::get_dupes(dat_all, Date, SiteID, TransectID, PlotID, Species) %>% View()
 
-dat_all %>%
-   group_by(Date, SiteID, TransectID, PlotID,  Species) %>%
-    janitor::get_dupes() %>% 
-    View()
 
-# dat_all %>% 
-#     filter(SiteID == "PO",
-#            TransectID %in% c(4.3, 2.3),
-#            PlotID %in% c(1, 3),
-#            Species %in% c("Lemna minor", "Utricularia vulgaris")) %>% 
-#     View()
+```
+
+2 dupes: 8/20/2020, PO 2.3, plot 1 - Utricularia vulgaris. exact dupe. 8/27/2015, PO 4.3, plot 3, Lemna minor has density as both 20 and 10.  
+
+Remove the exact dupe:  
+
+```{r}
+dat_all <- dat_all %>% distinct()
 ```
 
 
@@ -190,6 +184,28 @@ unique(dat_all$Type)
 
 
 # Fix discrepancies  
+
+Species names issues - some seemed to have a capital NA in the middle of a word; one genus was misspelled. Fixing here.  
+
+```{r}
+dat_all <- dat_all %>% 
+    mutate(Species = case_match(Species,
+                                "Potamogeton pectiNAtus" ~ "Potamogeton pectinatus",
+                                "Potamogeton NAtans" ~ "Potamogeton natans",
+                                "Phalaris arundiNAcea" ~ "Phalaris arundinacea",
+                                "Calamgrostis caNAdensis" ~ "Calamagrostis canadensis",
+                                "Calamagrostis caNAdensis" ~ "Calamagrostis canadensis",
+                                "Alnus incaNA" ~ "Alnus incana",
+                                .default = Species))
+```
+
+
+Turn Elevation into m (currently cm):  
+
+```{r}
+dat_all <- dat_all %>% 
+    mutate(Elevation = Elevation/100)
+```
 
 
 ## Column wrangling  
