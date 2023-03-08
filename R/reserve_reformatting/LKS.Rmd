@@ -123,12 +123,21 @@ janitor::get_dupes(dat_all, Date, SiteID, TransectID, PlotID, Species) %>% View(
 
 ```
 
-2 dupes: 8/20/2020, PO 2.3, plot 1 - Utricularia vulgaris. exact dupe. 8/27/2015, PO 4.3, plot 3, Lemna minor has density as both 20 and 10.  
+2 dupes: 8/20/2020, PO 2.3, plot 1 - Utricularia vulgaris. exact dupe. 8/27/2015, PO 4.3, plot 3, Lemna minor has density as both 20 and 10. Per an email from Kait (RC) in June 2022, the value of 10 belongs to the species Ricciocarpus natans. For Lemna, the value is 20.   
 
-Remove the exact dupe:  
+Remove the exact dupe and fix that species:  
 
 ```{r}
 dat_all <- dat_all %>% distinct()
+
+to_fix <- dat_all %>% 
+    mutate(rownum = row_number()) %>% 
+    filter(Date == as.Date("2015-08-27"),
+           TransectID == 4.3,
+           PlotID == 3,
+           Species == "Lemna minor",
+           Density == 10)
+dat_all$Species[to_fix$rownum[1]] <- "Ricciocarpus natans"
 ```
 
 
@@ -265,7 +274,7 @@ write.csv(dat_cdmo, here::here(problem_path_out, "LKS_issues.csv"),
 
 
 ```{r}
-write_xlsx(dat_cdmo, path = here::here(path_out, "Reserve_CDMO.xlsx"),
+write_xlsx(dat_cdmo, path = here::here(path_out, "LKS_CDMO.xlsx"),
            format_headers = TRUE)
 ```
 
