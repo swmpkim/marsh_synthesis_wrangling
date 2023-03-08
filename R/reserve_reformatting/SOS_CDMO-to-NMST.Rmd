@@ -116,6 +116,14 @@ dat <- dat %>%
 #     janitor::get_dupes()
 ```
 
+Because of some issues writing out the NMST file, I'm formatting both extra date columns as character.  
+
+```{r}
+dat <- dat %>% 
+    mutate(Date_HtDens = as.character(Date_HtDens),
+           Date_GPS = as.character(Date_GPS))
+```
+
 
 
 ## Identifiers  
@@ -176,7 +184,6 @@ janitor::get_dupes(covr, -Cover)
 ```{r}
 # pivot
 covr_wide <- covr %>% 
-    mutate(Date_HtDens = as.Date(Date_HtDens)) %>% 
     rename("F" = QAQC) %>% 
     pivot_wider(names_from = Species,
                 values_from = c(Cover, "F"),
