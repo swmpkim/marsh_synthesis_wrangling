@@ -1,15 +1,13 @@
 ---
 title: "South Slough"
 author: "Kim Cressman"
-date: "2022-08-16; latest update `r Sys.Date()`"
+date: "2022-08-16; latest update 2023-03-08"
 output: 
     html_document:
         toc: true
         toc_depth: 2
         code_folding: hide
 ---
-
-Use this template to set up the wrangling for an individual reserve's files.  
 
 
 ```{r setup, include=FALSE}
@@ -113,29 +111,7 @@ Include subplot if used by reserve. Want an empty tibble below.
 ```{r}
 unique(dat_all$Subplot)
 
-# subplot included
-# dat_all %>% 
-#    group_by(Date, SiteID, TransectID, PlotID, Subplot, Species) %>% 
-#     tally() %>% 
-#     filter(n > 1) %>% 
-#     select(Date:Species, n)
-
-# # no subplot included
-dat_all %>%
-   group_by(Date, SiteID, TransectID, PlotID,  Species) %>%
-    tally() %>%
-    filter(n > 1) %>%
-    select(Date:Species, n) %>% 
-    View()
-
-spp_dupes <- dat_all %>%
-   group_by(Date, SiteID, TransectID, PlotID,  Species) %>%
-    tally() %>%
-    filter(n > 1) %>%
-    select(Date:Species, n)
-# write.csv(spp_dupes,
-#           here::here("wrangled_data", "combined_with_issues", "SOS_dupes.csv"),
-#           row.names = FALSE)
+janitor::get_dupes(dat_all, Date, SiteID, TransectID, PlotID, Species) %>% View()
 ```
 
 
@@ -450,6 +426,44 @@ dat_all <- dat_all2
 ```
 
 
+# Join lat/long and elevation in a similar way to dens/ht  
+
+With a new column for Date_GPS  
+
+```{r}
+coords_to_join <- coords %>% 
+    filter(PlotID != "NA") %>% 
+    mutate(Year = lubridate::year(Date),
+           Date_GPS = Date) %>% 
+    select(-Date, -Reserve)
+```
+
+```{r}
+janitor::get_dupes(coords_to_join, SiteID, TransectID, PlotID, Year) %>% View()
+```
+
+
+There's a dupe in here, for 2016, FS, 3, 2, with different elevation values. Looking back at the raw files, these rows have different "plot_nom" identifiers. The larger value (2.491034) belongs to "q5w", which should be plot 1 (not 2). Cross-checked with Q5W in the height/density file. Fixing.  
+
+```{r}
+to_fix <- coords_to_join %>% 
+    mutate(rownum = row_number()) %>% 
+    filter(SiteID == "FS",
+           TransectID == "3",
+           PlotID == "2",
+           Year == 2016)
+
+coords_to_join$PlotID[to_fix$rownum[2]] <- "1"
+```
+
+## JOIN  
+
+```{r}
+dat_all <- left_join(dat_all, coords_to_join)
+```
+
+NOTE not all elevation data were joined; this was a left-join so the data were added to the main table only if cover data were present for the year that elevation was measured. This means 2011 elevations were not included.  
+
 # IMPORTANT NOTES FOR THIS RESERVE  
 
 Will average heights to get into CDMO format. Will insert density where it belongs. WHEN MAKING THE NAMASTE TEMPLATE, need to come back to this to get the REPLICATES OF HEIGHT DATA.  
@@ -473,9 +487,6 @@ dat_all <- dat_all %>%
                                 .na = ""),
            Subplot = ifelse(Subplot == " - ", NA_character_, Subplot),
            Rep = NA,
-           Lat = NA,
-           Long = NA,
-           "Orthometric Height" = NA,
            "Height Relative to MLLW" = NA,
            QAQC = NA_character_)
 
@@ -505,6 +516,7 @@ dat_cdmo <- dat_all %>%
         "Month",
         "Day",
         "Date_HtDens",
+        "Date_GPS",
         "SiteID",
         "TransectID",
         "PlotID",
@@ -514,8 +526,9 @@ dat_cdmo <- dat_all %>%
         "Lat",
         "Long",
         "Distance",
-        "Orthometric Height",
+        "Orthometric Height" = Orthometric_Height,
         "Height Relative to MLLW",
+        "Notes",
         "Species",
         "Cover",
         "Density",
