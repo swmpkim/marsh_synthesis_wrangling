@@ -122,12 +122,13 @@ dat <- dat %>%
 
 Should be the same between all sheets  
 
-update on 1/12/2023: added "Date_HtDens" to id_names
+update on 1/12/2023: added "Date_HtDens" to id_names  
+3/8/23: aded "Date_GPS" to id_names  
 
 ```{r}
 id_names <- c("Reserve", "SiteID", 
              "Year", "Month", "Day",
-             "Date_HtDens",
+             "Date_HtDens", "Date_GPS",
              "TransectID", "PlotID", # "Subplot",
              "Orthometric_Height", "Height_Relative_to_MLLW",
              "Distance")
@@ -365,12 +366,12 @@ hts_wide <- hts %>%
 Join back with ID columns from cover data frame  
 
 ```{r}
-dens_sheet <- covr_wide %>% 
-    select(Reserve:Distance) %>% 
+dens_sheet <- covr_sheet %>% 
+    select(Reserve:Notes) %>% 
     full_join(dens_wide, by = c("Year", "SiteID", "TransectID", "PlotID"))
 
-hts_sheet <- covr_wide %>% 
-    select(Reserve:Distance) %>% 
+hts_sheet <- covr_sheet %>% 
+    select(Reserve:Notes) %>% 
     full_join(hts_wide, by = c("Year", "SiteID", "TransectID", "PlotID"))
 ```
 
