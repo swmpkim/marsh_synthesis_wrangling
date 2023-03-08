@@ -430,11 +430,15 @@ dat_all <- dat_all2
 
 With a new column for Date_GPS  
 
+ALSO changing the site "DP" to "DM" to match others  
+
 ```{r}
 coords_to_join <- coords %>% 
     filter(PlotID != "NA") %>% 
     mutate(Year = lubridate::year(Date),
-           Date_GPS = Date) %>% 
+           Date_GPS = Date,
+           SiteID = case_when(SiteID == "DP" ~ "DM",
+                              .default = SiteID)) %>% 
     select(-Date, -Reserve)
 ```
 
@@ -553,41 +557,3 @@ write_xlsx(dat_cdmo, path = here::here(path_out, paste0(reserve, "_CDMO.xlsx")),
 ```
 
 
-# NaMaSTe tables  
-
-Get rid of any NAs in lat/long; we want station characteristics.  
-
-```{r}
-station_table <- dat_cdmo %>% 
-    select(Reserve,
-           SiteID,
-           TransectID,
-           PlotID,
-           Lat,
-           Long,
-           Type,
-           "SSAM-1") %>% 
-    distinct() %>% 
-    arrange(SiteID, TransectID, PlotID)
-```
-
-Do any plots have multiple rows?  
-
-```{r}
-station_table %>% 
-    group_by(Reserve, SiteID, TransectID, PlotID) %>% 
-    tally() %>% 
-    arrange(desc(n)) %>% 
-    head() %>% 
-    knitr::kable()
-```
-
-Are all stations actually represented? If the below output is FALSE, there's a problem to fix. If TRUE, proceed.     
-
-```{r}
-stns_all <- dat_cdmo %>% 
-    select(Reserve, SiteID, TransectID, PlotID) %>% 
-    distinct()
-
-nrow(stns_all) == nrow(station_table)
-```
