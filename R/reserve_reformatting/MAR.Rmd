@@ -45,7 +45,7 @@ Also create an output folder for each reserve in the `wrangled data` folder and 
 
 ```{r}
 path_start <- here::here("submitted_data", "data", "MAR", "Vegetation and Metadata")
-path_out <- here::here("wrangled_data", "MAR")
+path_out <- here::here("wrangled_data", "CDMO")
 
 # create the output folder if it doesn't already exist
 if(!dir.exists(path_out)){
