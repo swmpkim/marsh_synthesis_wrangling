@@ -165,6 +165,13 @@ dat_all %>%
     knitr::kable()
 ```
 
+### Remove transect from the plotID  
+
+```{r}
+dat_all <- dat_all %>% 
+    mutate(PlotID = str_split_i(PlotID, "-", i = -1))
+```
+
 
 ### 'Distance' discrepancies  
 
