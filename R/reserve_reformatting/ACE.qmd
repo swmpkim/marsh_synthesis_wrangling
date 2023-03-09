@@ -377,7 +377,11 @@ dens_sheet <- covr_sheet %>%
 hts_sheet <- covr_sheet %>% 
     select(Reserve:Notes) %>% 
     left_join(select(hts_wide, -Day))
+```
 
+Fix for heights
+
+```{r}
 # get the first batch of names (before any species)
 nms1 <- hts_sheet %>% 
     select(Reserve:Notes) %>% 
@@ -395,6 +399,26 @@ names(hts_sheet) <- c(nms1, nms2)
 
 # anti_join(hts_wide, covr_sheet) %>% View()
 ```
+
+Fix names for density  
+
+```{r}
+# get the first batch of names (before any species)
+nms1 <- dens_sheet %>% 
+    select(Reserve:Notes) %>% 
+    names()
+
+# change the 2nd batch of names (species)
+nms2 <- dens_sheet %>% 
+    select(-c(Reserve:Notes)) %>% 
+    names() %>% 
+    str_replace(., "_", " ")
+
+# concatenate the strings of names to assign to dens_sheet
+names(dens_sheet) <- c(nms1, nms2)
+```
+
+
 
 NOTE: there were height measurements present (30 rows) for July of 2013. Because there were not corresponding cover measurements, I excluded them from the NMST file.  
 
