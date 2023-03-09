@@ -94,7 +94,8 @@ spp_dens <- dens %>%
     select(-(1:Notes),
            -starts_with("F_")) %>% 
     names() %>% 
-    str_remove("\\s\\d")
+    str_remove("\\s\\d+") %>% 
+    unique()
 
 dens_covr <- spp_dens %in% names(spp_covr)
 if(sum(!dens_covr) > 0){
@@ -127,7 +128,9 @@ spp_hts <- hts %>%
     select(-(1:Notes),
            -starts_with("F_")) %>% 
     names() %>% 
-    str_remove("\\s\\d")
+    str_remove("\\s\\d+") %>% 
+    unique()
+
 hts_covr <- spp_hts %in% names(spp_covr)
 if(sum(!hts_covr) > 0){
     cli::cli_warn(c("Species with reported height measurements 
