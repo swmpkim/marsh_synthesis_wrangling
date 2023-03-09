@@ -367,6 +367,7 @@ covr_sheet <- left_join(covr_sheet, c_notes) %>%
 
 The Density sheet has a date of 10/31/2017 for T6 Plots 1, 2, and 3. Date for that transect everywhere else is 10/30. This seems to have happened with heights too. I will ignore it by joining only on Year and Month, rather than Year-Month-Day.  
 
+Update 3/9/2023 to change the names of reps in the Heights sheet to remove underscores.  
 
 ```{r}
 dens_sheet <- covr_sheet %>% 
@@ -376,6 +377,21 @@ dens_sheet <- covr_sheet %>%
 hts_sheet <- covr_sheet %>% 
     select(Reserve:Notes) %>% 
     left_join(select(hts_wide, -Day))
+
+# get the first batch of names (before any species)
+nms1 <- hts_sheet %>% 
+    select(Reserve:Notes) %>% 
+    names()
+
+# change the 2nd batch of names (species)
+nms2 <- hts_sheet %>% 
+    select(-c(Reserve:Notes)) %>% 
+    names() %>% 
+    str_replace(., "_", " ")
+
+# concatenate the strings of names to assign to hts_sheet
+names(hts_sheet) <- c(nms1, nms2)
+
 
 # anti_join(hts_wide, covr_sheet) %>% View()
 ```
