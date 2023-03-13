@@ -121,7 +121,7 @@ Because of some issues writing out the NMST file, I'm formatting both extra date
 ```{r}
 dat <- dat %>% 
     mutate(Date_HtDens = as.character(Date_HtDens),
-           Date_GPS = as.character(Date_GPS))
+           Date_Elevation = as.character(Date_Elevation))
 ```
 
 
@@ -131,12 +131,13 @@ dat <- dat %>%
 Should be the same between all sheets  
 
 update on 1/12/2023: added "Date_HtDens" to id_names  
-3/8/23: aded "Date_GPS" to id_names  
+3/8/23: added "Date_GPS" to id_names  
+3/13/23: changed Date_GPS to Date_Elevation  
 
 ```{r}
 id_names <- c("Reserve", "SiteID", 
              "Year", "Month", "Day",
-             "Date_HtDens", "Date_GPS",
+             "Date_HtDens", "Date_Elevation",
              "TransectID", "PlotID", # "Subplot",
              "Orthometric_Height", "Height_Relative_to_MLLW",
              "Distance")

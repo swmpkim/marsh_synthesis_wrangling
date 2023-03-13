@@ -227,11 +227,13 @@ cover_discreps <- dat_all %>%
 
 # Bring in lat/long  
 
-Lat, long, and elevations are measured on a different timeline than veg data - for at least one site (FS), cover measurements were taken in July and elevation/lat/long measurements in September of a couple different years. Not sure whether I should tie these together then.....  
+Lat, long, and elevations are measured on a different timeline than veg data - for at least one site (FS), cover measurements were taken in July and elevation/lat/long measurements in September of a couple different years. As with dens/ht, am joining on year only, and inserting a new column for the date of positional information.  
+
+NOTE: new file for elevations, has had some more QA/QC; started using new file (2010_2022) on 3/13/23.  
 
 ```{r}
 coords <- read_xlsx(here::here(path_start,  
-                               "SOS_Elevations_2010_2021.xlsx")) %>% 
+                               "SOS_Elevations_2010_2022.xlsx")) %>% 
     select(SiteID = Site,
            TransectID,
            PlotID,
@@ -436,7 +438,7 @@ ALSO changing the site "DP" to "DM" to match others
 coords_to_join <- coords %>% 
     filter(PlotID != "NA") %>% 
     mutate(Year = lubridate::year(Date),
-           Date_GPS = Date,
+           Date_Elevation = Date,
            SiteID = case_when(SiteID == "DP" ~ "DM",
                               .default = SiteID)) %>% 
     select(-Date, -Reserve)
@@ -447,18 +449,6 @@ janitor::get_dupes(coords_to_join, SiteID, TransectID, PlotID, Year) %>% View()
 ```
 
 
-There's a dupe in here, for 2016, FS, 3, 2, with different elevation values. Looking back at the raw files, these rows have different "plot_nom" identifiers. The larger value (2.491034) belongs to "q5w", which should be plot 1 (not 2). Cross-checked with Q5W in the height/density file. Fixing.  
-
-```{r}
-to_fix <- coords_to_join %>% 
-    mutate(rownum = row_number()) %>% 
-    filter(SiteID == "FS",
-           TransectID == "3",
-           PlotID == "2",
-           Year == 2016)
-
-coords_to_join$PlotID[to_fix$rownum[2]] <- "1"
-```
 
 ## JOIN  
 
@@ -520,7 +510,7 @@ dat_cdmo <- dat_all %>%
         "Month",
         "Day",
         "Date_HtDens",
-        "Date_GPS",
+        "Date_Elevation",
         "SiteID",
         "TransectID",
         "PlotID",
