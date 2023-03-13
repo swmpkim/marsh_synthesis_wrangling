@@ -430,9 +430,11 @@ dat_all <- dat_all2
 
 # Join lat/long and elevation in a similar way to dens/ht  
 
-With a new column for Date_GPS  
+With a new column for Date_Elevation    
 
 ALSO changing the site "DP" to "DM" to match others  
+
+Update 3/13/23 - Some sites had cover measurements in 2010 and elevations in 2011. Some sites had cover measurements in both years. I am making a duplicate data frame of the 2011 coordinates and changing the year to 2010 so that the former will have elevation data joined to them. The Date_Elevation column should show that the elevation readings were taken later, but this also gives us lats and longs for sites that didn't necessarily have them before.  
 
 ```{r}
 coords_to_join <- coords %>% 
@@ -442,10 +444,16 @@ coords_to_join <- coords %>%
            SiteID = case_when(SiteID == "DP" ~ "DM",
                               .default = SiteID)) %>% 
     select(-Date, -Reserve)
+
+coords_to_2010 <- coords_to_join %>% 
+    filter(Year == 2011) %>% 
+    mutate(Year = 2010)
+
+coords_to_join <- bind_rows(coords_to_join, coords_to_2010)
 ```
 
 ```{r}
-janitor::get_dupes(coords_to_join, SiteID, TransectID, PlotID, Year) %>% View()
+janitor::get_dupes(coords_to_join, SiteID, TransectID, PlotID, Year) 
 ```
 
 
