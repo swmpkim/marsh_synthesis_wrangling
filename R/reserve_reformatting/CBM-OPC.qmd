@@ -140,7 +140,11 @@ covr_in <- left_join(covr_in, transectSingle) %>%
     mutate(Date = case_when(is.na(Date) ~ Date2,
                             TRUE ~ Date)) %>% 
     select(-Date2) %>% 
-    rename("Sparganium americanum" = "Sparganium spp.")
+    rename("Sparganium americanum" = "Sparganium spp.") %>% 
+    rowwise() %>% 
+    mutate(Unidentified = sum(`Unknown Grass spp.`, `Unidentified`, na.rm = TRUE)) %>% 
+    rename("Unknown spp." = Unidentified) %>% 
+    select(-`Unknown Grass spp.`) 
 ```
 
 
@@ -150,10 +154,10 @@ covr_in <- left_join(covr_in, transectSingle) %>%
 Renaming:  
 
 +  Bidens aristosa to Bidens aristosa/frondosa in both density and height, per conversation with Kyle D. Both species are present and impossible to tell apart unless flowering. We were planning to go with Bidens sp. but another species is present (Bidens laevis). Density only.    
-+  Decadon verticillatus to Decodon verticillatus (original was typo). Density only.  
++  Decadon verticillatus to Decodon verticillatus (original was typo). Density and Height.    
 +  Dichanthelum spp. to Dichanthelium spp. (typo). Height only.  
 +  Sparganium spp. to Sparganium americanum (per Kyle, americanum is only species present). COVER only (performed above).  
-+  Unknown Grass spp. to Unknown spp. Both density and height.  
++  Unknown Grass spp. to Unknown spp. Density, Height, and Cover. Note: Cover also has "Unidentified", which was added to Unknown spp.    
 
 ```{r}
 dens_in <- read_excel(file_in, sheet = "Stem Density", skip = 11)
@@ -184,7 +188,7 @@ hts_in <- read_excel(file_in, sheet = "Max Height Data", skip = 9)
 hts <- hts_in %>% 
     janitor::remove_empty("cols") %>% 
     rename(# "Bidens aristosa/frondosa" = "Bidens aristosa",
-           # "Decodon verticillatus" = "Decadon verticillatus"
+           "Decodon verticillatus" = "Decadon verticillatus",
            "Dichanthelium spp." = "Dichanthelum spp."
            # "Sparganium americanum" = "Sparganium spp."
            ) %>% 
@@ -210,7 +214,9 @@ names(hts_to_join)[6:ncol(hts_to_join)] <- htsNames[6:ncol(hts_to_join)]
 spp_covr <- read_excel(file_in, 
                        sheet = "Cover Data", 
                        skip = 11, n_max = 2,
-                       col_names = FALSE)
+                       col_names = FALSE) %>% 
+    select(-"...89")  # because I combined 2 'unknown' columns in covr_in; this is one of them (Unidentified)
+
 names(spp_covr) <- names(covr_in)
 spp_covr <- spp_covr %>% 
     filter(row_number() != 2) %>% 
@@ -219,7 +225,8 @@ spp_covr <- spp_covr %>%
 spp_names <- spp_covr %>% 
     pivot_longer(everything(),
                  names_to = "Species",
-                 values_to = "Common name")
+                 values_to = "Common name") %>% 
+    filter(Species != "Comment")
 ```
 
 
