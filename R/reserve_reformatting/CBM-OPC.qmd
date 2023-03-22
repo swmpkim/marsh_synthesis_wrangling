@@ -139,17 +139,34 @@ covr_in <- left_join(covr_in, transectSingle) %>%
     filter(!is.na(Date2)) %>% 
     mutate(Date = case_when(is.na(Date) ~ Date2,
                             TRUE ~ Date)) %>% 
-    select(-Date2)
+    select(-Date2) %>% 
+    rename("Sparganium americanum" = "Sparganium spp.")
 ```
 
 
 
 ## Density  
 
+Renaming:  
+
++  Bidens aristosa to Bidens aristosa/frondosa in both density and height, per conversation with Kyle D. Both species are present and impossible to tell apart unless flowering. We were planning to go with Bidens sp. but another species is present (Bidens laevis). Density only.    
++  Decadon verticillatus to Decodon verticillatus (original was typo). Density only.  
++  Dichanthelum spp. to Dichanthelium spp. (typo). Height only.  
++  Sparganium spp. to Sparganium americanum (per Kyle, americanum is only species present). COVER only (performed above).  
++  Unknown Grass spp. to Unknown spp. Both density and height.  
+
 ```{r}
 dens_in <- read_excel(file_in, sheet = "Stem Density", skip = 11)
 dens <- dens_in %>% 
-    janitor::remove_empty("cols")
+    janitor::remove_empty("cols") %>% 
+    rename("Bidens aristosa/frondosa" = "Bidens aristosa",
+           "Decodon verticillatus" = "Decadon verticillatus"
+           # "Dichanthelium spp." = "Dichanthelum spp.",
+           # "Sparganium americanum" = "Sparganium spp.",
+           ) %>% 
+    rowwise() %>% 
+    mutate(`Unknown spp.` = sum(`Unknown spp.`, `Unknown Grass spp.`, na.rm = TRUE)) %>% 
+    select(-`Unknown Grass spp.`)
 ```
 
 ```{r}
@@ -165,7 +182,16 @@ names(dens_to_join)[6:ncol(dens_to_join)] <- densNames[6:ncol(dens_to_join)]
 ```{r}
 hts_in <- read_excel(file_in, sheet = "Max Height Data", skip = 9)
 hts <- hts_in %>% 
-    janitor::remove_empty("cols")
+    janitor::remove_empty("cols") %>% 
+    rename(# "Bidens aristosa/frondosa" = "Bidens aristosa",
+           # "Decodon verticillatus" = "Decadon verticillatus"
+           "Dichanthelium spp." = "Dichanthelum spp."
+           # "Sparganium americanum" = "Sparganium spp."
+           ) %>% 
+    rowwise() %>% 
+    mutate(`Unknown spp. 2` = sum(`Unknown spp.`, `Unknown Grass spp.`, na.rm = TRUE)) %>% 
+    select(-`Unknown Grass spp.`, -`Unknown spp.`) %>% 
+    rename("Unknown spp." = "Unknown spp. 2")
 ```
 
 
