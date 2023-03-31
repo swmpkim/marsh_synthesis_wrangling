@@ -106,11 +106,45 @@ hud_tiv <- hud_tiv %>%
 rm(csvs, csvs_in, excels, excels_in, lnlt, points,
    spgeo, sputm, tmp, col_matching, csvss, xlsxs)
 
+# UPDATE 3/31/23 - deal with ND in Elevation, Cover, Density, Ht
+# also deal with "NA" and "NA " in Ht
+
+hud_tiv <- hud_tiv %>% 
+    mutate(Elevation = case_match(Elevation,
+                                  "ND" ~ NA_character_,
+                                  .default = Elevation),
+           Cover = case_match(Cover,
+                              "ND" ~ NA_character_,
+                              .default = Cover),
+           Density = case_match(Density,
+                                "ND" ~ NA_character_,
+                                "NA" ~ NA_character_,
+                                .default = Density),
+           Ht = case_match(Ht,
+                           "ND" ~ NA_character_,
+                           "NA" ~ NA_character_,
+                           "NA " ~ NA_character_)) %>% 
+    mutate(across(c(Cover, Density, Ht, Elevation), as.numeric))
+           
+
+    
 
 ############### CHECKS ##########################
 dat_all <- hud_tiv
 # Column names and types
 names(dat_all)
+
+
+# Deal with NAs in Site and Transect by splitting Plot ID
+dat_all <- dat_all %>% 
+    select(-SiteID, -TransectID) %>% 
+    separate(PlotID, into = c("SiteID", "Plot-Transect"),
+             sep = "-") %>% 
+    mutate(TransectID = str_extract(`Plot-Transect`, "[A-Z]"),
+           PlotID = str_extract_all(`Plot-Transect`, "[0-9]")) %>% 
+    select(-`Plot-Transect`) %>% 
+    select(Reserve, SiteID, TransectID, PlotID, Date, everything())
+
 
 # Duplicates in date-site-transect-plot-species
 # we want to see an empty table
@@ -127,12 +161,47 @@ unique(dat_all$Subplot)
 dupes <- dat_all %>%
     select(Date, SiteID, TransectID, PlotID,  Species, Cover, Density, Ht) %>% 
     janitor::get_dupes(-c(Cover, Density, Ht))
-write.csv(dupes, here::here("wrangled_data", "combined_with_issues", "HUD-TIV_dupes.csv"),
-          row.names = FALSE)
+# write.csv(dupes, here::here("wrangled_data", "combined_with_issues", "HUD-TIV_dupes.csv"),
+#           row.names = FALSE)
 
 # get rid of the 9 exact dupes
 dat_all <- dat_all %>% 
-    distinct(Date, SiteID, PlotID, Species, .keep_all = TRUE)
+    distinct(Date, SiteID, TransectID, PlotID, Species, .keep_all = TRUE)
+
+
+# deal with some elevation discrepancies that caused dupes when pivoting
+dat_all %>% 
+    select(Date, SiteID, TransectID, PlotID, Elevation, Species) %>% 
+    mutate(Elevation = round(Elevation, 4)) %>% 
+    group_by(SiteID, TransectID, PlotID, Date, Elevation) %>% 
+    summarize(n = n()) %>% 
+    ungroup() %>% 
+    janitor::get_dupes(SiteID, TransectID, PlotID, Date) %>% 
+    View()
+
+dat_all <- dat_all %>% 
+    mutate(Elevation = round(Elevation, 4),
+           Year = lubridate::year(Date),
+           tmpID = paste(SiteID, TransectID, PlotID, Year, sep = "-")) %>% 
+    mutate(Elevation = case_when(tmpID %in% c("CIS-C-4-2014", "CIS-C-4-2015") ~ -1.4965,
+                                 tmpID == "ITN-C-4-2015" ~ 0.5225,
+                                 tmpID %in% c("ITN-C-2-2014", "ITN-C-2-2015") ~ 0.3690,
+                                 tmpID %in% c("ITN-C-3-2014", "ITN-C-3-2015") ~ 0.4855,
+                                 .default = Elevation
+                                 )) %>% 
+    select(-tmpID, -Year)
+
+
+# make sure it worked
+dat_all %>% 
+    select(Date, SiteID, TransectID, PlotID, Elevation, Species) %>% 
+    mutate(Elevation = round(Elevation, 4)) %>% 
+    group_by(SiteID, TransectID, PlotID, Date, Elevation) %>% 
+    summarize(n = n()) %>% 
+    ungroup() %>% 
+    janitor::get_dupes(SiteID, TransectID, PlotID, Date) %>% 
+    View()
+
 
 # Station/plot names
 unique(dat_all$Reserve)
@@ -162,7 +231,7 @@ spp <- dat_all %>%
     group_by(Species) %>% 
     tally()
 spp_out_path <- here::here("wrangled_data", "combined_with_issues", "HUD-TIV_species.csv") 
-write.csv(spp, spp_out_path, row.names = FALSE)
+# write.csv(spp, spp_out_path, row.names = FALSE)
 # looks good
 
 
