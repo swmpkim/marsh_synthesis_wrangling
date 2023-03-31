@@ -123,7 +123,8 @@ hud_tiv <- hud_tiv %>%
            Ht = case_match(Ht,
                            "ND" ~ NA_character_,
                            "NA" ~ NA_character_,
-                           "NA " ~ NA_character_)) %>% 
+                           "NA " ~ NA_character_,
+                           .default = Ht)) %>% 
     mutate(across(c(Cover, Density, Ht, Elevation), as.numeric))
            
 
