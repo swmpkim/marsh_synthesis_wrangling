@@ -49,13 +49,13 @@ In a Shiny app, let someone pick this interactively. Here, hard-code. Using MAR 
 # reserve <- "GND"  # updated 8/19/22; updated 1/13/23; updated 3/8/23
 # reserve <- "KAC"  # updated 8/19/22
 # reserve <- "LKS"  # updated 8/19/22; again 3/8/23
-reserve <- "MAR"  # completed 6/17/22; updated 3/9/23
+# reserve <- "MAR"  # completed 6/17/22; updated 3/9/23
 # reserve <- "NOC-MI"  # completed 6/17/22
 # reserve <- "NOC-RC"  # completed 6/17/22
 # reserve <- "NOC-ZI"  # completed 6/17/22
 # reserve <- "GTM"  # completed 6/21/22  # re-done 7/6/22 with higher 'skip-max' because orthometric height read in wrong
 # reserve <- "DEL-SJR" # updated 8/19/22
-# reserve <- "DEL-BCR" # completed 12/20/22
+reserve <- "DEL-BCR" # completed 12/20/22
 # reserve <- "SOS"
 # reserve <- "HUD-PIER" # completed 12/20/22
 # reserve <- "HUD-TIV"  # completed 12/20/22

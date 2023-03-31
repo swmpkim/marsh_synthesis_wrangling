@@ -228,6 +228,16 @@ dat_all <- dat_all %>%
     ) 
 ```
 
+UPDATE 3/31/2023: There was a mismatch in Rep and Distance for Transect F, plot F4, in 2018. This resulted in a duplicate row in density and height sheets. Fixing here.  
+
+```{r}
+dat_all <- dat_all %>% 
+    mutate(Rep = case_when(Year == 2018 & PlotID == "F4" ~ 1,
+                           .default = Rep),
+           Distance = case_when(Year == 2018 & PlotID == "F4" ~ 120,
+                                .default = Distance))
+```
+
 
 
 ## CDMO format (long)  
@@ -278,41 +288,3 @@ write_xlsx(dat_cdmo, path = here::here(path_out, "DEL-BCR_CDMO.xlsx"),
 ```
 
 
-# NaMaSTe tables  
-
-Get rid of any NAs in lat/long; we want station characteristics.  
-
-```{r}
-station_table <- dat_cdmo %>% 
-    select(Reserve,
-           SiteID,
-           TransectID,
-           PlotID,
-           Lat,
-           Long,
-           Type,
-           "SSAM-1") %>% 
-    filter(!is.na(Lat),
-           !is.na(Long)) %>% 
-    distinct()
-```
-
-Do any plots have multiple rows?  
-
-```{r}
-station_table %>% 
-    group_by(Reserve, SiteID, TransectID, PlotID) %>% 
-    tally() %>% 
-    arrange(desc(n)) %>% 
-    knitr::kable()
-```
-
-Are all stations actually represented? If the below output is FALSE, there's a problem to fix. If TRUE, proceed.     
-
-```{r}
-stns_all <- dat_cdmo %>% 
-    select(Reserve, SiteID, TransectID, PlotID) %>% 
-    distinct()
-
-nrow(stns_all) == nrow(station_table)
-```
