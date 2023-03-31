@@ -55,10 +55,10 @@ In a Shiny app, let someone pick this interactively. Here, hard-code. Using MAR 
 # reserve <- "NOC-ZI"  # completed 6/17/22
 # reserve <- "GTM"  # completed 6/21/22  # re-done 7/6/22 with higher 'skip-max' because orthometric height read in wrong
 # reserve <- "DEL-SJR" # updated 8/19/22
-reserve <- "DEL-BCR" # completed 12/20/22
+# reserve <- "DEL-BCR" # completed 12/20/22  # updated 3/31/23 to remove dupes
 # reserve <- "SOS"
 # reserve <- "HUD-PIER" # completed 12/20/22
-# reserve <- "HUD-TIV"  # completed 12/20/22
+reserve <- "HUD-TIV"  # completed 12/20/22  # updated 3/31/23 to remove dupes due to elevation discrepancies
 # reserve <- "JAC"  # completed 1/27/23
 # reserve <- "TJR"  # completed 2/6/23
 ```

@@ -141,7 +141,7 @@ dat_all <- dat_all %>%
     separate(PlotID, into = c("SiteID", "Plot-Transect"),
              sep = "-") %>% 
     mutate(TransectID = str_extract(`Plot-Transect`, "[A-Z]"),
-           PlotID = str_extract_all(`Plot-Transect`, "[0-9]")) %>% 
+           PlotID = str_extract(`Plot-Transect`, "[0-9]")) %>% 
     select(-`Plot-Transect`) %>% 
     select(Reserve, SiteID, TransectID, PlotID, Date, everything())
 
