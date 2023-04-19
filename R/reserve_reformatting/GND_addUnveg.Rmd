@@ -51,6 +51,21 @@ dat <- bind_rows(dat, to_join) %>%
     mutate(Date = format(Date, "%m/%d/%Y"))
 ```
 
+
+Fix the site ID stuff!  
+
+```{r}
+table(dat$SiteID)
+
+dat <- dat %>% 
+    mutate(SiteID = case_when(SiteID == "clamj" ~ "clmaj",
+                              SiteID == "spal" ~ "spalt",
+                              TRUE ~ SiteID))
+
+table(dat$SiteID)
+```
+
+
 Re-write CDMO file:  
 
 ```{r}
