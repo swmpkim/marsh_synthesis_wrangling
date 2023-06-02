@@ -8,4 +8,6 @@ submitted_data/
 wrangled_data/
 Reserve_Info.xlsx
 *.Rproj
+*.html
+*.xlsx
 
