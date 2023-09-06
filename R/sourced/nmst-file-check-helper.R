@@ -31,7 +31,7 @@ if(sum(!(col_chk)) > 0){
 
 # check for duplicate rows  
 dupes_gen <- janitor::get_dupes(covr,
-                   Year, SiteID, TransectID, PlotID)
+                   Year, Month, Day, SiteID, TransectID, PlotID)
 
 if(nrow(dupes_gen) > 0){
     cli::cli_warn("The Cover sheet has duplicate rows:")
