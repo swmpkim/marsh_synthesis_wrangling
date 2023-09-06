@@ -30,8 +30,13 @@ if(sum(!(col_chk)) > 0){
 }
 
 # check for duplicate rows  
-janitor::get_dupes(covr,
+dupes_gen <- janitor::get_dupes(covr,
                    Year, SiteID, TransectID, PlotID)
+
+if(nrow(dupes_gen) > 0){
+    cli::cli_warn("The Cover sheet has duplicate rows:")
+    print(dupes_gen)
+}
 
 
 # species name checks  
