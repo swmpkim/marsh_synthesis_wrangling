@@ -1,7 +1,7 @@
 ---
 title: "TJR"
 author: "Kim Cressman"
-date: "2023-01-30; latest update 2023-09-06"
+date: "2023-01-30; latest update 2023-09-20"
 output: 
     html_document:
         toc: true
@@ -9,7 +9,9 @@ output:
         code_folding: hide
 ---
 
-TJR update run 9/6/2023 due to corrected file. Quadrats were labelled incorrectly in original file.
+TJR update run 9/6/2023 due to corrected file. Quadrats were labelled incorrectly in original file.  
+
+Updated again 9/20/2023, with additional corrections to quadrats. Also including GPS coordinates, sent separately.  
 
 
 ```{r setup, include=FALSE}
@@ -66,7 +68,7 @@ dir(path_start)
 Which ones to read in?  **MODIFY FOR EACH RESERVE**  
 
 ```{r}
-file_in <- here::here(path_start, "All TJE VEG 15Nov22 v2 for NAMASTE_corrections20230901.xlsx")
+file_in <- here::here(path_start, "All TJE VEG 15Nov22 v2 for NAMASTE_corrections20230914.xlsx")
 
 dat_all <- read_xlsx(file_in) %>% 
     rename(SiteID = Site,
@@ -111,8 +113,8 @@ TJR_dupes <- janitor::get_dupes(dat_all,
                    Year, Season, SiteID, TransectID, PlotID, Species,
                    "Live/Dead") 
 
-write_xlsx(TJR_dupes, here::here(problem_path_out, 
-                                 "TJR_dupes_20230906.xlsx"))
+# write_xlsx(TJR_dupes, here::here(problem_path_out, 
+#                                  "TJR_dupes_20230906.xlsx"))
 ```
 
 
@@ -149,7 +151,13 @@ no Distance column
 
 ### Lat/Long discrepancies  
 
-no lat/long in data
+read in station table with lat/long, ortho height, and MLLW height here.  
+
+```{r}
+stn_tbl_init <- read_xlsx(here::here(path_start, "TJR_NMST coord.xlsx"),
+                          sheet = "TJR_NMST coord")
+```
+
 
 
 ## Mangroves or SAV present?  
@@ -185,9 +193,9 @@ spp <- dat_all %>%
     group_by(Species) %>% 
     tally()
 
-spp_out_path <- here::here("wrangled_data", "combined_with_issues", paste0(reserve, "_species_20230906.csv")) 
-
-write.csv(spp, spp_out_path, row.names = FALSE)
+# spp_out_path <- here::here("wrangled_data", "combined_with_issues", paste0(reserve, "_species_20230906.csv")) 
+# 
+# write.csv(spp, spp_out_path, row.names = FALSE)
 ```
 
 # Fix discrepancies  
@@ -254,13 +262,15 @@ janitor::get_dupes(dat_all, SiteID, TransectID, PlotID, Species, Date)
 
 CDMO column names, in order. If columns had different names, or there were additional ones, account for that here.    
 
-Need to create Density and Height columns.  
+Need to create Density and Height columns. Also need to join in station table information.    
 
 ```{r}
 dat_all$Density <- NA
 dat_all$Ht <- NA
-dat_all$Lat <- NA
-dat_all$Long <- NA
+
+dat_all <- dat_all %>% 
+    select(-Type) %>% 
+    left_join(., stn_tbl_init)
 ```
 
 
@@ -278,6 +288,8 @@ dat_cdmo <- dat_all %>%
         "PlotID",
         "Lat",
         "Long",
+        "Orthometric_Height",
+        "Height_Relative_to_MLLW",
         "Species",
         "Cover",
         "Density",
