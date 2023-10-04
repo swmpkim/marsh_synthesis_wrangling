@@ -2,6 +2,7 @@
 title: "CBM-MB"
 format: html
 ---
+Re-run (updated file_in) 10/4/2023 due to corrections in input file: MSHST3 transect changed to MCHST3.  
 
 ```{r}
 library(tidyverse)
@@ -13,7 +14,7 @@ library(writexl)
 # starting path for data
 path_start <- here::here("submitted_data", "data")
 file_in <- here::here(path_start, "CBM", "Veg", "Monie Bay", 
-                      "MASTER MBR_EV_Transect_Data_Current_2017.xlsx")
+                      "MASTER MBR_EV_Transect_Data_Corrected_2017.xlsx")
 
 # excel_sheets(file_in)
 ```
