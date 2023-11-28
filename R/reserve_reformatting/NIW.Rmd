@@ -327,6 +327,11 @@ Want to replace these with the values from the row below each (from subplot 1 in
 
 Date is character format, so it ought to be easy to pull out the indices and do it.  
 
+Update 11/28/2023: Additional problems, that caused duplicate rows in the Density sheet:  
+
++  08/27/2009, Segment B, Transect 1, Plot 2  
++  08/28/2009, Segment A, Transect 2, Plot 1  
+
 ```{r}
 # pull out column indices
 colsToFix <- which(names(dat_cdmo) %in% c("SSAM-1", "Lat", "Long", "Distance", "Orthometric_Height", "Height_Relative_to_MLLW"))
@@ -385,6 +390,62 @@ dat_cdmo[issue3, colsToFix]
 dat_cdmo[issue3[1], colsToFix] <- dat_cdmo[issue3[2], colsToFix]
 # make sure it looks fixed
 dat_cdmo[issue3, colsToFix]
+
+
+
+# 4th IN THE LIST
+# pull out row indices
+issue4 <- dat_cdmo %>% 
+    mutate(rownum = row_number()) %>% 
+    filter(Date == "08/27/2009",
+           SiteID == "Segment B",
+           TransectID == 1,
+           PlotID == 2) %>% 
+    select(rownum) %>% 
+    unlist()
+
+# the first and last of those rows are wonky; replace with the 2nd
+# see other rows from this site-transect-plot combination to verify
+# issue4b <- dat_cdmo %>% 
+#     mutate(rownum = row_number()) %>% 
+#     filter(SiteID == "Segment B",
+#            TransectID == 1,
+#            PlotID == 2) 
+
+# make sure I'm looking at the right things
+dat_cdmo[issue4, colsToFix]
+# make the changes
+dat_cdmo[issue4[1], colsToFix] <- dat_cdmo[issue4[2], colsToFix]
+dat_cdmo[issue4[4], colsToFix] <- dat_cdmo[issue4[2], colsToFix]
+# make sure it looks fixed
+dat_cdmo[issue4, colsToFix]
+
+
+# 5th IN THE LIST
+# pull out row indices
+issue5 <- dat_cdmo %>% 
+    mutate(rownum = row_number()) %>% 
+    filter(Date == "08/28/2009",
+           SiteID == "Segment A",
+           TransectID == 2,
+           PlotID == 1) %>% 
+    select(rownum) %>% 
+    unlist()
+
+# the ones with ortho ht around 1 are the correct ones
+# see other rows from this site-transect-plot combination to verify
+# issue5b <- dat_cdmo %>%
+#     mutate(rownum = row_number()) %>%
+#     filter(SiteID == "Segment A",
+#            TransectID == 2,
+#            PlotID == 1)
+
+# make sure I'm looking at the right things
+dat_cdmo[issue5, colsToFix]
+# make the changes
+dat_cdmo[issue5[c(1, 5, 6, 10)], colsToFix] <- dat_cdmo[issue5[2], colsToFix]
+# make sure it looks fixed
+dat_cdmo[issue5, colsToFix]
 ```
 
 
