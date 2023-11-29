@@ -1,7 +1,7 @@
 ---
 title: "GND unveg"
 output: html_document
-date: "2023-03-08"
+date: "2023-03-08; updated 2023-11-29"
 ---
 
 ```{r setup, include=FALSE}
@@ -10,6 +10,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 GND doesn't have explicitly identified "unvegetated" covers. Adding them here, as 100 - (sum of identified covers). Seems easiest to do this from the Namaste formatted file. Will then add to the CDMO file.  
 
+11-29-23 update: starting from latest CDMO file, which has the site name issue resolved (spal/spalt and clamj/clmaj). In starting manual NMST formatting, staff noticed certain rows didn't add up to 100 - which is mostly because the calculations didn't get performed entirely correctly the first time (???). We also found two plots where the total was >100, and those will be fixed in this script as well.  
 
 ```{r}
 library(tidyverse)
@@ -20,49 +21,104 @@ library(writexl)
 
 ```{r}
 dat <- read_xlsx(here::here("wrangled_data", 
-                            "combined_with_issues",
-                            "GND_CDMO_SiteIssues.xlsx"),
-                 na = c("", "NA")) 
+                            "CDMO",
+                            "GND_CDMO_not100s.xlsx"),
+                 na = c("", "NA")) %>% 
+    filter(!is.na(Year))
 ```
+
+
+```{r}
+# unvegetated is in here
+"Unvegetated" %in% unique(dat$Species)
+
+# but sites are right
+unique(dat$SiteID)
+
+dat %>%  
+    summarize(.by = c(Year, Month, Day, SiteID, TransectID, PlotID),
+              total = sum(Cover, na.rm = TRUE))  %>%  
+    arrange(desc(total))  %>%  
+    View()
+```
+
+
+## Fix the plots > 100  
+
+Wait for GND verification before finalizing  
+
+```{r}
+# 55 is a typo, change to 5
+rowind <- dat %>% 
+    mutate(rownum = row_number()) %>% 
+    filter(Year == 2017,
+        SiteID == "juro mid",
+        TransectID == 1,
+        PlotID == 1,
+        Species == "Panicum virgatum") %>% 
+    select(rownum) %>% 
+    unlist()
+dat[rowind,
+     "Cover"] <- 5
+
+# subtract 2.5 from the species with the highest cover in the plot
+rowind <- dat %>% 
+    mutate(rownum = row_number()) %>% 
+    filter(Year == 2017,
+        SiteID == "clmaj",
+        TransectID == 3,
+        PlotID == 2,
+        Species == "Ilex vomitoria") %>% 
+    select(rownum) %>% 
+    unlist()
+dat[rowind,
+     "Cover"] <- 37.5
+
+
+# check it
+dat %>%  
+    summarize(.by = c(Year, Month, Day, SiteID, TransectID, PlotID),
+              total = sum(Cover, na.rm = TRUE))  %>%  
+    arrange(desc(total))  %>%  
+    View()
+# good, nothing left over 100
+```
+
+## Find plots < 100  
 
 Generate data for unvegetateds....  
 
 ```{r}
-Totals <- dat %>% 
-    group_by(SiteID, TransectID, PlotID, Year, Month, Day) %>% 
-    summarize(TotalCover = sum(Cover)) %>% 
-    ungroup()
+Totals <- dat %>%  
+    summarize(.by = c(Year, Month, Day, SiteID, TransectID, PlotID),
+              total = sum(Cover, na.rm = TRUE)) 
 
-Unvegs <- Totals %>% 
-    mutate(Unvegetated = 100 - TotalCover,
-           Unvegetated = case_when(Unvegetated < 0 ~ 0,
-                                   .default = Unvegetated))
+Total_live <- dat %>%  
+    filter(Species != "Unvegetated") %>% 
+    summarize(.by = c(Year, Month, Day, SiteID, TransectID, PlotID),
+              total_live = sum(Cover, na.rm = TRUE))
 
-to_join <- dat %>% 
-    select(Reserve:`Height Relative to MLLW`) %>% 
-    distinct() %>% 
-    full_join(Unvegs) %>% 
-    select(-TotalCover) %>% 
-    mutate(Species = "Unvegetated") %>% 
-    rename(Cover = Unvegetated)
+All <- left_join(dat, Totals) %>% 
+    left_join(Total_live)
 
-dat <- bind_rows(dat, to_join) %>% 
-    arrange(Year, Month, Day, SiteID, TransectID, PlotID, Species) %>% 
-    mutate(Date = format(Date, "%m/%d/%Y"))
+All2 <- All %>% 
+    mutate(Cover2 = case_when(Species == "Unvegetated" & total != 100 ~ 100 - total_live,
+                              .default = Cover))
+
+dat2 <- All2 %>% 
+    mutate(Cover = Cover2) %>% 
+    select(-total, -total_live, -Cover2)
 ```
 
-
-Fix the site ID stuff!  
-
 ```{r}
-table(dat$SiteID)
+# check it
+dat2 %>%  
+    summarize(.by = c(Year, Month, Day, SiteID, TransectID, PlotID),
+              total = sum(Cover, na.rm = TRUE))  %>%  
+    arrange(total)  %>%  
+    View()
 
-dat <- dat %>% 
-    mutate(SiteID = case_when(SiteID == "clamj" ~ "clmaj",
-                              SiteID == "spal" ~ "spalt",
-                              TRUE ~ SiteID))
-
-table(dat$SiteID)
+dat <- dat2
 ```
 
 
