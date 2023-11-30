@@ -45,34 +45,34 @@ dat %>%
 
 ## Fix the plots > 100  
 
-Wait for GND verification before finalizing  
+Per JP in emails 11/29-11/30/2023: 2017 Juro Mid should be 5% Juro, 10% Sppatens, and 0 for everything else. 2017 clmaj, change "unknown" to 2.5.    
 
 ```{r}
-# 55 is a typo, change to 5
+# juro mid site, change 60 and 55 to 0
 rowind <- dat %>% 
     mutate(rownum = row_number()) %>% 
     filter(Year == 2017,
         SiteID == "juro mid",
         TransectID == 1,
         PlotID == 1,
-        Species == "Panicum virgatum") %>% 
+        Species %in% c("Panicum virgatum", "Cladium jamaicense")) %>% 
     select(rownum) %>% 
     unlist()
 dat[rowind,
-     "Cover"] <- 5
+     "Cover"] <- 0
 
-# subtract 2.5 from the species with the highest cover in the plot
+# change unknown to 2.5
 rowind <- dat %>% 
     mutate(rownum = row_number()) %>% 
     filter(Year == 2017,
         SiteID == "clmaj",
         TransectID == 3,
         PlotID == 2,
-        Species == "Ilex vomitoria") %>% 
+        Species == "Unknown") %>% 
     select(rownum) %>% 
     unlist()
 dat[rowind,
-     "Cover"] <- 37.5
+     "Cover"] <- 2.5
 
 
 # check it
