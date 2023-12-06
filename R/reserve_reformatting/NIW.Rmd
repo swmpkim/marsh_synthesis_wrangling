@@ -607,6 +607,8 @@ covr_sheet_out <- covr_wide %>%
 
 Density and Height sheets can be built from `dens_wide` and `ht_wide` but I'm worried rows won't 100% match the cover sheet.  
 
+12/6/23 update: the above concern was proven correct. Rows do not match. 
+
 ```{r}
 dens_sheet <- dens_wide %>% 
     select(-c(Type, Date, `SSAM-1`, Rep, Lat, Long)) %>% 
@@ -618,6 +620,90 @@ hts_sheet <- ht_wide %>%
     relocate(Notes, .after = Height_Relative_to_MLLW)
 ```
 
+12/6/23 updates to make rows match between covr_sheet_out, dens_sheet, and hts_sheet.  
+
+```{r}
+# really need Reservee:PlotID to match
+# *want* Distance:Notes to match as well
+
+must_match <- c("Reserve", "Year", "Month", "Day", "SiteID", "TransectID", "PlotID")
+
+should_match <- c("Distance", "Orthometric_Height", "Height_Relative_to_MLLW", "Notes")
+
+nrow(covr_sheet_out); nrow(dens_sheet); nrow(hts_sheet)
+
+# cover sheet has many more rows than the others
+# need to find out who has which extra rows
+
+covr_rows <- covr_sheet_out %>% 
+    select(all_of(must_match)) %>% 
+    mutate("Cover_sheet" = 1) 
+dens_rows <- dens_sheet %>% 
+    select(all_of(must_match)) %>% 
+    mutate("Dens_sheet" = 1)
+ht_rows <- hts_sheet %>% 
+    select(all_of(must_match)) %>% 
+    mutate("Ht_sheet" = 1)
+
+all_rows <- full_join(covr_rows, dens_rows) %>% 
+    full_join(ht_rows) %>% 
+    mutate("Missing_X_times" = is.na(Cover_sheet) + is.na(Dens_sheet) + is.na(Ht_sheet))
+
+table(all_rows$Missing_X_times)
+all_rows %>% arrange(desc(Missing_X_times)) %>% View()
+```
+
+Nothing is ever missing from the Cover sheet, so can pull rows from there.   
+
+```{r}
+covr_rows <- covr_sheet_out %>% 
+    select(all_of(must_match),
+           all_of(should_match))
+
+dens_sheet <- left_join(covr_rows, dens_sheet)
+hts_sheet <- left_join(covr_rows, hts_sheet)
+```
+
+
+Need to make sure to arrange everything in the same order across all sheets.
+
+```{r}
+covr_sheet_out <- covr_sheet_out %>% 
+    arrange(Year, Month, Day,
+            SiteID, TransectID, PlotID)
+
+dens_sheet <- dens_sheet %>% 
+    arrange(Year, Month, Day,
+            SiteID, TransectID, PlotID)
+
+hts_sheet <- hts_sheet %>% 
+    arrange(Year, Month, Day,
+            SiteID, TransectID, PlotID)
+```
+
+
+Pull them out again and make sure all match.  
+
+```{r}
+covr_rows <- covr_sheet_out %>% 
+    select(all_of(must_match),
+           all_of(should_match))
+
+dens_rows <- dens_sheet %>% 
+    select(all_of(must_match),
+           all_of(should_match))
+
+ht_rows <- hts_sheet %>% 
+    select(all_of(must_match),
+           all_of(should_match))
+
+testthat::expect_equal(covr_rows, dens_rows)
+testthat::expect_equal(covr_rows, ht_rows)
+```
+
+Passed.
+
+END 12/6/23 UPDATE
 
 
 Back to code from `pivot_CDMO-to-NMST.Rmd`  
