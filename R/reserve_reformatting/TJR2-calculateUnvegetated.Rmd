@@ -1,0 +1,700 @@
+---
+title: "TJR"
+author: "Kim Cressman"
+date: "2023-01-30; latest update 2024-04-22"
+output: 
+    html_document:
+        toc: true
+        toc_depth: 2
+        code_folding: hide
+---
+
+This file generated 4/22/2024 because TJR's data is formatted differently from others: they first generate an estimate of how much of each quadrat is covered ("total cover"); 100-that is 'unvegetated'. Then they quantify the species even in different layers, as %s of the amount covered - so to force to 2d, these need to be divided by total cover; and unvegetated is the rest....
+
+
+
+TJR update run 9/6/2023 due to corrected file. Quadrats were labelled incorrectly in original file.  
+
+Updated again 9/20/2023, with additional corrections to quadrats. Also including GPS coordinates, sent separately.  
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      warning = FALSE,
+                      message = FALSE)
+```
+
+```{r}
+library(tidyverse)
+library(readxl)
+library(writexl)
+library(leaflet)
+library(rgdal)
+library(stringi)  # for stri_sub_replace()
+
+reserve <- "TJR"
+```
+
+# Setup  
+
+## Helpful functions  
+
+Because I'll be doing this repetitively on similar data files....  
+
+```{r}
+source(here::here("R", "sourced", "00_helper_functions.R"))
+```
+
+## Data path  
+
+Update for each reserve: all start at  `here::here("submitted_data", "data")` but it varies by reserve.   
+
+Also create an output folder for each reserve in the `wrangled data` folder and update the `path_out` below.  
+
+```{r}
+path_start <- here::here("submitted_data", "data", reserve)
+problem_path_out <- here::here("wrangled_data", "combined_with_issues")
+path_out <- here::here("wrangled_data", "CDMO")
+
+# create the output folder if it doesn't already exist
+if(!dir.exists(path_out)){
+    dir.create(path_out)
+}
+```
+
+
+What are the files?  
+
+```{r}
+dir(path_start)  
+```
+
+Which ones to read in?  **MODIFY FOR EACH RESERVE**  
+
+```{r}
+file_in <- here::here(path_start, "All TJE VEG 15Nov22 v2 for NAMASTE_corrections20230914.xlsx")
+
+dat_all <- read_xlsx(file_in) %>% 
+    rename(SiteID = Site,
+           TransectID = Transect,
+           PlotID = Quadrat,
+           Cover = PercentCover)
+```
+
+
+# Checks  
+
+## Column names and types?  
+
+Look for different column names for the same thing.  
+
+```{r}
+names(dat_all)
+```
+
+## Duplicates in date-site-transect-plot-species  
+
+Include subplot if used by reserve. Want an empty tibble below.    
+
+```{r}
+# unique(dat_all$Subplot)
+
+# # subplot included
+# dat_all %>% 
+#    group_by(Date, SiteID, TransectID, PlotID, Subplot, Species) %>% 
+#     tally() %>% 
+#     filter(n > 1) %>% 
+#     select(Date:Species, n)
+
+# no subplot included
+dat_all %>%
+   group_by(Year, SiteID, TransectID, PlotID,  Species) %>%
+    tally() %>%
+    filter(n > 1) %>%
+    select(Year:Species, n)
+
+TJR_dupes <- janitor::get_dupes(dat_all,
+                   Year, Season, SiteID, TransectID, PlotID, Species,
+                   "Live/Dead") 
+
+# write_xlsx(TJR_dupes, here::here(problem_path_out, 
+#                                  "TJR_dupes_20230906.xlsx"))
+```
+
+
+## Check station/plot names  
+
+```{r}
+dat_all$Reserve <- "TJR"
+unique(dat_all$Reserve)
+```
+
+```{r}
+dat_all %>% 
+    select(Reserve, SiteID, TransectID, PlotID) %>% 
+    distinct() %>% 
+    arrange(SiteID, TransectID, PlotID) %>% 
+    knitr::kable()
+```
+
+
+### 'Distance' discrepancies  
+
+no Distance column
+
+```{r}
+# stn_dupes <- dat_all %>% 
+#     select(Reserve, SiteID, TransectID, PlotID,
+#            Distance) %>% 
+#     distinct() %>% 
+#     janitor::get_dupes(-Distance)
+# 
+# stn_dupes
+```
+
+
+### Lat/Long discrepancies  
+
+read in station table with lat/long, ortho height, and MLLW height here.  
+
+```{r}
+stn_tbl_init <- read_xlsx(here::here(path_start, "TJR_NMST coord.xlsx"),
+                          sheet = "TJR_NMST coord")
+```
+
+
+
+## Mangroves or SAV present?  
+
+Mangrove species are: *Avicennia germinans*, *Laguncularia racemosa*, *Rhizophora mangle*. Check for these before discarding a `Height` or `Diameter` column.   
+
+The following sums will be 0 if none of the genus names were found in the species column. This is only set to detect the first few letteres in case of misspellings, so if any sums are above 0, it deserves further investigation.  
+
+```{r}
+spp_all <- sort(unique(dat_all$Species))
+knitr::kable(spp_all)
+sum(str_detect(spp_all, "Avic"))
+sum(str_detect(spp_all, "Lagunc"))
+sum(str_detect(spp_all, "Rhizo"))
+
+```
+
+Species names all look okay!
+
+Also check for anything other than 'E' in 'Type'.
+
+```{r}
+dat_all$Type <- "E"
+unique(dat_all$Type)
+```
+
+## Check species names  
+
+```{r}
+dat_all$Species <- str_replace(dat_all$Species, pattern = "  ", replacement = " ")
+    
+spp <- dat_all %>% 
+    group_by(Species) %>% 
+    tally()
+
+# spp_out_path <- here::here("wrangled_data", "combined_with_issues", paste0(reserve, "_species_20230906.csv")) 
+# 
+# write.csv(spp, spp_out_path, row.names = FALSE)
+```
+
+# Fix discrepancies  
+
+## Dupes  
+
+Annotated spreadsheet says what to do.  
+
+```{r}
+dupe_fix <- read_xlsx(here::here("wrangled_data",
+                                 "combined_with_issues",
+                                 "TJR_dupes-with-comments_20230906.xlsx"),
+                      n_max = 13)
+
+dat_all <- dat_all %>%
+    full_join(dupe_fix) %>% 
+    mutate(Species = case_when(!is.na(Fix_column) ~ Fix_column,
+                               TRUE ~ Species)) %>% 
+    filter(Species != "remove") %>% 
+    select(-dupe_count, -Fix_column)
+
+
+# double check for more dupes  
+janitor::get_dupes(dat_all, SiteID, TransectID, PlotID, Species, `Live/Dead`, `Season/Year`)
+```
+
+
+
+## Column wrangling  
+
+### Dates  
+
+Pull out columns for Month, Day, and Year; and format Date as mm/dd/yyyy for the CDMO output file.  
+
+TJR had issues with date entry so cannot provide full information at this time. For Namaste project, because date itself doesn't really matter, we will use October 15th as Month-Day for all readings. Reserve will correct after-the-fact as they are able to find time.  
+
+```{r}
+dat_all <- dat_all %>% 
+    mutate(
+        Month = 10,
+        Day = 15,
+        Date = lubridate::ymd(paste(Year, Month, Day, sep = "-")),
+        Date = format(Date, "%m/%d/%Y")
+    ) 
+```
+
+### Live/Dead  
+
+Only want to append to species name when veg was dead. If "live" or "NA", leave species as-is.  
+
+```{r}
+dat_all <- dat_all %>% 
+    mutate(Species = case_when(`Live/Dead` == "Dead" ~ paste0(Species, "_Dead"),
+                               TRUE ~ Species))
+
+# check for dupes  
+janitor::get_dupes(dat_all, SiteID, TransectID, PlotID, Species, Date)
+```
+
+
+
+
+## CDMO format (long)  
+
+CDMO column names, in order. If columns had different names, or there were additional ones, account for that here.    
+
+Need to create Density and Height columns. Also need to join in station table information.    
+
+```{r}
+dat_all$Density <- NA
+dat_all$Ht <- NA
+
+dat_all <- dat_all %>% 
+    select(-Type) %>% 
+    left_join(., stn_tbl_init)
+```
+
+
+```{r}
+dat_cdmo <- dat_all %>% 
+    select(
+        "Reserve",
+        "Type",
+        "Date",
+        "Year",
+        "Month",
+        "Day",
+        "SiteID",
+        "TransectID",
+        "PlotID",
+        "Lat",
+        "Long",
+        "Orthometric_Height",
+        "Height_Relative_to_MLLW",
+        "Species",
+        "Cover",
+        "Density",
+        "Ht"
+    )
+```
+
+
+## Write the CDMO data frame to a file. **Modify for each reserve**  
+
+```{r}
+# write.csv(dat_cdmo, here::here(problem_path_out, paste0(reserve, "_issues.csv")), 
+#           row.names= FALSE,
+#           na = "")
+```
+
+```{r}
+write_xlsx(dat_cdmo, path = here::here(path_out, paste0(reserve, "_CDMO.xlsx")),
+           format_headers = TRUE)
+```
+
+
+# Rather than CDMO script, use this  
+
+Because CDMO-to-NMST script won't deal with the total cover issue we've got. Need to widen it here and fix.  
+
+
+```{r}
+# function to pick first non-NA reading for any given plot ("at establishment")
+establ <- function(df, x){
+    
+    x_vec <- df %>% 
+        select({{x}})
+    
+    if(sum(!is.na(x_vec)) == 0){
+        out <- df %>% 
+            select(SiteID, TransectID, PlotID, {{x}}) %>% 
+            distinct() 
+    } else {
+        out <- df %>% 
+            select(Date, SiteID, TransectID, PlotID, {{x}}) %>% 
+            distinct() %>% 
+            group_by(SiteID, TransectID, PlotID) %>% 
+            filter(!is.na({{x}})) %>%
+            filter(Date == min(Date)) %>% 
+            select(-Date)
+    }
+        
+    out
+}
+```
+
+```{r}
+# path <- here::here("wrangled_data", "CDMO", "MAR_CDMO.xlsx")
+path <- here::here("wrangled_data", "CDMO", paste0(reserve, "_CDMO.xlsx"))
+
+# out_path <- here::here("wrangled_data", "NMST", "MAR_NMST.xlsx")
+out_path <- here::here("wrangled_data", "NMST", paste0(reserve, "_NMST.xlsx"))
+```
+
+
+Renaming possibilities:  
+
+```{r}
+col_matching <- c("Orthometric_Height" = "Orthometric Height",
+                  "Height_Relative_to_MLLW" = "Height Relative to MLLW",
+                  "Ht" = "Canopy Height",
+                  "Ht" = "Average Canopy Height",
+                  "Ht" = "Maximum Canopy Height")
+
+# deal with different types of canopy height measurement
+res_info <- read_xlsx(here::here("Reserve_Info.xlsx"))
+ht_type <- unlist(res_info[res_info$Reserve == reserve, "Height_CDMO"])
+```
+
+Read in data and rename:  
+
+
+
+```{r}
+dat <- dat_cdmo %>% 
+    rename(any_of(col_matching)) %>% 
+    filter(!is.na(Year)) %>% 
+    mutate(Date = lubridate::ymd(paste(Year, Month, Day, sep = "-")))
+```
+
+Add required columns if they don't exist. QAQC, SSAM-1, OrthoHt, HtMLLW, Distance.
+
+```{r}
+if(!exists("QAQC", dat)){
+  dat$QAQC <- NA  
+}
+
+if(!exists("SSAM-1", dat)){
+  dat$`SSAM-1` <- NA  
+}
+
+if(!exists("Orthometric_Height", dat)){
+  dat$Orthometric_Height <- NA  
+}
+
+if(!exists("Height_Relative_to_MLLW", dat)){
+  dat$Height_Relative_to_MLLW <- NA  
+}
+
+if(!exists("Distance", dat)){
+  dat$Distance <- NA  
+}
+```
+
+
+## Identifiers  
+
+Should be the same between all sheets  
+
+```{r}
+id_names <- c("Reserve", "SiteID", 
+             "Year", "Month", "Day",
+             "TransectID", "PlotID",
+             "Orthometric_Height", "Height_Relative_to_MLLW",
+             "Distance")
+
+# only use ID columns that exist in the data frame
+id_names <- id_names[which(id_names %in% names(dat))]
+```
+
+## Deal with notes separately  
+
+If there's not a Notes column, make one full of NAs.  
+
+```{r}
+if(exists("Notes", dat)){
+    notes <- dat %>% 
+        filter(!is.na(Notes))
+    c_notes <- notes %>% 
+        group_by(SiteID, Year, Month, Day, TransectID, PlotID) %>% 
+        summarize(Notes = str_c(unique(Notes), collapse = "; "))
+} else {
+    c_notes <- dat %>% 
+        group_by(SiteID, Year, Month, Day, TransectID, PlotID) %>% 
+        summarize(Notes = NA_character_)
+}
+```
+
+# Cover sheet  
+
+NOTE this sheet also has average canopy height and density. Replicates are on the other sheets.  
+
+## Cover data  
+
+```{r}
+covr <- dat %>% 
+    select(all_of(id_names), Species, Cover, QAQC)
+
+# make sure there aren't any dupes  
+janitor::get_dupes(covr, -Cover)
+```
+
+```{r}
+# pivot
+covr_wide <- covr %>% 
+    rename("F" = QAQC) %>% 
+    pivot_wider(names_from = Species,
+                values_from = c(Cover, "F"),
+                names_sort = TRUE)
+
+# get the 'Cover' prefix out of the names
+names(covr_wide) <- str_replace(names(covr_wide), "^(Cover_)", "")
+```
+
+# INSERT UNVEG COLUMN  
+
+```{r}
+covr_wide <- covr_wide %>% 
+    mutate(Unvegetated = 100 - `Total Cover`,
+           F_Unvegetated = NA_real_) %>% 
+    relocate(Unvegetated, .after = `Unknown seedling`)
+```
+
+
+```{r}
+test1 <- covr_wide %>% 
+    select(-`Total Cover`,
+           -Unvegetated,
+           -all_of(starts_with("F_")),
+           -c(Reserve:Distance))
+test1_sums <- rowSums(test1, na.rm = TRUE)
+
+# which row sums are way less than 100? Does that equal the 'Total Cover'?
+lowSums <- which(test1_sums < 80)
+# generally pretty close, yes
+
+View(cbind(test1_sums[lowSums], covr_wide[lowSums, c("Total Cover", "Year")]))
+
+
+# what about ones way above 100..... must be different canopy layers
+# which row sums are way less than 100? Does that equal the 'Total Cover'?
+highSums <- which(test1_sums > 120)
+# generally pretty close, yes
+
+View(cbind(test1_sums[highSums], covr_wide[highSums, c("Total Cover", "Year")]))
+
+# both of these happen across all years
+```
+
+# CORRECT TO TOTAL COVER AMOUNT  
+
+```{r}
+test2 <- cbind(rowSum = test1_sums,
+               Cov = covr_wide$`Total Cover`,
+               test1)
+test3 <- test2 %>% 
+    mutate(across(.cols = 3:ncol(test2),
+                  ~round(./rowSum * Cov, 1)))
+
+newSum <- rowSums(test3[,3:ncol(test3)], na.rm = TRUE)
+cbind(test2[,1:2],
+      newSum) %>% 
+    View()
+```
+
+Add unvegetated back in......  
+
+Check with Dave and Chris - make sure this jives. Also check to make sure both live and dead should be normalized like that (not just live or something). We aren't treating any other files in this thorough of a way so I'm a little uncomfortable with it, but am also uncomforatble ignoring it if this is in fact what the reserve would want done (maybe we need to check with Jeff as well?)
+
+
+## Density data  
+
+```{r}
+dens <- dat %>% 
+    select(all_of(id_names), Species, Density) %>% 
+    filter(!is.na(Density)) %>% 
+    pivot_wider(names_from = Species,
+                values_from = Density,
+                names_prefix = "Density_",
+                names_sort = TRUE)
+```
+
+
+## Height data  
+
+```{r}
+hts <- dat %>% 
+    select(all_of(id_names), Species, Ht) %>% 
+    filter(!is.na(Ht)) %>% 
+    pivot_wider(names_from = Species,
+                values_from = Ht,
+                names_prefix = paste0(ht_type, "_"),
+                names_sort = TRUE)
+```
+
+
+## Mangrove height and diameter  
+
+if applicable.  
+
+```{r}
+spp_all <- sort(unique(dat$Species))
+
+# are mangroves present in the species list
+mangroves <- sum(str_detect(spp_all, "Avic")) + sum(str_detect(spp_all, "Lagunc")) + sum(str_detect(spp_all, "Rhizo"))
+
+# what are those species
+mang_spp <- spp_all[str_which(spp_all, "Avic")]
+
+if(mangroves > 0){
+    dat_mang_ht <- dat %>% 
+        filter(Species %in% mang_spp) %>% 
+        select(all_of(id_names), Species, Height) %>% 
+        pivot_wider(names_from = Species,
+                values_from = Height,  # Height in original dataset is mangrove height
+                names_prefix = "Height_")
+    
+    dat_mang_diam <- dat %>% 
+        filter(Species %in% mang_spp) %>% 
+        select(all_of(id_names), Species, Diameter) %>% 
+        pivot_wider(names_from = Species,
+                values_from = Diameter,  # Height in original dataset is mangrove height
+                names_prefix = "Diameter_")
+    
+    dat_mang <- full_join(dat_mang_ht, dat_mang_diam)
+}
+```
+
+
+## Join them all  
+
+```{r}
+covr_sheet <- full_join(covr_wide, dens) %>% 
+    full_join(hts) %>% 
+    full_join(c_notes) %>% 
+    select(all_of(id_names), Notes, everything()) %>% 
+    relocate(Notes, .after = Distance) %>% 
+    relocate(starts_with("F_"), .after = last_col())
+
+# join in mangrove heights and diameters too
+if(mangroves > 0){
+    covr_sheet <- full_join(covr_sheet, dat_mang) %>% 
+        relocate(starts_with("F_"), .after = last_col())
+}
+```
+
+## If NA columns, remove  
+
+This can happen when reserves don't sample a site on a certain date, but they have a placeholder row in the data where species is blank. During pivoting, an 'NA' column is created. So is an 'F_NA' column.  
+
+```{r}
+if("NA" %in% names(covr_sheet)){
+    covr_sheet$"NA" <- NULL
+}
+
+if("F_NA" %in% names(covr_sheet)){
+    covr_sheet$"F_NA" <- NULL
+}
+```
+
+
+# Density sheet  
+
+Subset from covr_sheet to ensure equal number of rows between sheets  
+
+```{r}
+dens_sheet <- covr_sheet %>% 
+    select(all_of(id_names), Notes,
+           starts_with("Density_"))
+
+# get the 'Density' prefix out of the names
+names(dens_sheet) <- str_replace(names(dens_sheet), "^(Density_)", "")
+```
+
+
+# Height sheet  
+
+Subset from covr_sheet to ensure equal number of rows between sheets  
+
+```{r}
+hts_sheet <- covr_sheet %>% 
+    select(all_of(id_names), Notes,
+           starts_with(as.character(ht_type)))
+
+# get the 'Height' prefix out of the names
+# will start with either Maximum or Average Canopy Height
+names(hts_sheet) <- str_replace(names(hts_sheet), "^([MAa-z]+ Canopy Height_)", "")
+```
+
+
+# Station Table  
+
+Everything in this table is the first recorded value.  
+
+
+```{r}
+# there must be a better way to do this, but it works.
+
+stns <- dat %>% 
+    select(Reserve, SiteID, TransectID, PlotID) %>% 
+    distinct() %>% 
+    arrange(SiteID, TransectID, PlotID)
+lats <- establ(dat, Lat)
+longs <- establ(dat, Long)
+ssam1 <- establ(dat, `SSAM-1`)
+dists <- establ(dat, Distance)
+orth_hts <- establ(dat, Orthometric_Height) 
+mllw_hts <- establ(dat, Height_Relative_to_MLLW)
+types <- establ(dat, Type)
+
+stn_tbl <- full_join(stns, lats) %>% 
+    full_join(longs) %>% 
+    full_join(types) %>% 
+    full_join(orth_hts) %>% 
+    full_join(mllw_hts) %>%
+    full_join(dists) %>% 
+    full_join(ssam1)
+
+```
+
+
+
+# Species List  
+
+```{r}
+spp_names <- dat %>% 
+    select(Species) %>% 
+    distinct() %>% 
+    arrange(Species)
+```
+
+
+
+
+# Write to Excel  
+
+```{r}
+write_xlsx(list(Station_Table = stn_tbl,
+                Species_Names = spp_names,
+                Cover = covr_sheet,
+                Density = dens_sheet,
+                Height = hts_sheet),
+           path = out_path,
+           format_headers = TRUE)
+```
+
+
+
