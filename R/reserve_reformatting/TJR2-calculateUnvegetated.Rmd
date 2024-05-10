@@ -9,7 +9,9 @@ output:
         code_folding: hide
 ---
 
-This file generated 4/22/2024 because TJR's data is formatted differently from others: they first generate an estimate of how much of each quadrat is covered ("total cover"); 100-that is 'unvegetated'. Then they quantify the species even in different layers, as %s of the amount covered - so to force to 2d, these need to be divided by total cover; and unvegetated is the rest....
+This file generated 4/22/2024 because TJR's data is formatted differently from others: they first generate an estimate of how much of each quadrat is covered ("total cover"); 100-that is 'unvegetated'. Then they quantify the species even in different layers, as %s of the amount covered - so to force to 2d, these need to be divided by total cover; and unvegetated is the rest....  
+
+updated 5/10/2024 to make sure columns come out in the same order as they exist in the manually-formatted file - I'd rather copy and paste a single data frame than make someone start all over with the file formatting.  
 
 
 
@@ -517,7 +519,42 @@ cbind(test2[,1:2],
 
 Add unvegetated back in......  
 
-Check with Dave and Chris - make sure this jives. Also check to make sure both live and dead should be normalized like that (not just live or something). We aren't treating any other files in this thorough of a way so I'm a little uncomfortable with it, but am also uncomforatble ignoring it if this is in fact what the reserve would want done (maybe we need to check with Jeff as well?)
+Check with Dave and Chris - make sure this jives. Also check to make sure both live and dead should be normalized like that (not just live or something). We aren't treating any other files in this thorough of a way so I'm a little uncomfortable with it, but am also uncomforatble ignoring it if this is in fact what the reserve would want done (maybe we need to check with Jeff as well?)  
+
+
+```{r}
+# from covr_wide, select the id cols and unvegetated (and f_unvegetated)
+# then bind cols to the df where I calculated the normalized data (test3)
+covr_corrected <- covr_wide %>% 
+    select(all_of(id_names), Unvegetated, all_of(starts_with("F_"))) %>% 
+    select(-`F_Total Cover`) %>% 
+    bind_cols(test3)
+
+# names(covr_wide)[which(!(names(covr_wide) %in% names(covr_corrected)))]
+```
+
+```{r}
+# read in the currently formatted file to get them in the right order
+uncorr <- read_xlsx(here::here("Data", "TJR_veg_preNormalizing.xlsx"),
+                    sheet = "Cover")
+
+# get the names in the sheet
+# but only the ones that are in the file
+ordered_names <- names(uncorr)[which(names(uncorr) %in% names(covr_corrected))]
+
+covr_wide2 <- covr_corrected %>% 
+    select(all_of(ordered_names))
+
+names(covr_wide)[which(!(names(covr_wide) %in% names(covr_wide2)))]
+
+covr_wide <- covr_wide2
+
+# write out for updating - update manual file only
+write.csv(covr_wide,
+          here::here("wrangled_data", "NMST", "TJR_NormalizedCoverAndUnveg.csv"),
+          row.names = FALSE,
+          na = "")
+```
 
 
 ## Density data  
